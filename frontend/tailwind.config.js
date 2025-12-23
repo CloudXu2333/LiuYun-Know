@@ -1,0 +1,141 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./index.html",
+    "./src/**/*.{vue,js,ts,jsx,tsx}",
+  ],
+  theme: {
+    extend: {
+      colors: {
+        // Gemini 风格配色
+        'gemini': {
+          bg: '#f8f9fa',
+          surface: '#ffffff',
+          card: '#ffffff',
+          border: '#e8eaed',
+          text: {
+            primary: '#1f1f1f',
+            secondary: '#5f6368',
+            tertiary: '#80868b',
+          },
+          blue: {
+            50: '#e8f0fe',
+            100: '#d2e3fc',
+            200: '#aecbfa',
+            300: '#8ab4f8',
+            400: '#669df6',
+            500: '#4285f4',
+            600: '#1a73e8',
+            700: '#1967d2',
+            800: '#185abc',
+            900: '#174ea6',
+          },
+          purple: {
+            50: '#f3e8fd',
+            100: '#e9d2fd',
+            200: '#d7aefb',
+            300: '#c58af9',
+            400: '#b166f7',
+            500: '#9c27b0',
+            600: '#8e24aa',
+            700: '#7b1fa2',
+            800: '#6a1b9a',
+            900: '#4a148c',
+          },
+          green: {
+            50: '#e6f4ea',
+            100: '#ceead6',
+            200: '#a8dab5',
+            300: '#81c995',
+            400: '#5bb974',
+            500: '#34a853',
+            600: '#1e8e3e',
+            700: '#188038',
+            800: '#137333',
+            900: '#0d652d',
+          },
+          red: {
+            50: '#fce8e6',
+            100: '#fad2cf',
+            200: '#f6aea9',
+            300: '#f28b82',
+            400: '#ee675c',
+            500: '#ea4335',
+            600: '#d93025',
+            700: '#c5221f',
+            800: '#b31412',
+            900: '#a50e0e',
+          },
+          yellow: {
+            50: '#fef7e0',
+            100: '#feefc3',
+            200: '#fde293',
+            300: '#fdd663',
+            400: '#fcc934',
+            500: '#fbbc04',
+            600: '#f9ab00',
+            700: '#f29900',
+            800: '#ea8600',
+            900: '#e37400',
+          },
+        },
+      },
+      backgroundImage: {
+        'gradient-gemini': 'linear-gradient(135deg, #4285f4 0%, #9c27b0 100%)',
+        'gradient-gemini-soft': 'linear-gradient(135deg, #e8f0fe 0%, #f3e8fd 100%)',
+        'gradient-shimmer': 'linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent)',
+      },
+      boxShadow: {
+        'gemini': '0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15)',
+        'gemini-hover': '0 1px 3px 0 rgba(60,64,67,0.3), 0 4px 8px 3px rgba(60,64,67,0.15)',
+        'gemini-lg': '0 2px 6px 2px rgba(60,64,67,0.15)',
+        'gemini-xl': '0 4px 12px 4px rgba(60,64,67,0.15)',
+      },
+      borderRadius: {
+        'gemini': '8px',
+        'gemini-lg': '12px',
+        'gemini-xl': '16px',
+        'gemini-2xl': '24px',
+        'gemini-full': '9999px',
+      },
+      animation: {
+        'fade-in': 'fadeIn 0.3s ease-in-out',
+        'slide-up': 'slideUp 0.3s ease-out',
+        'slide-down': 'slideDown 0.3s ease-out',
+        'scale-in': 'scaleIn 0.2s ease-out',
+        'shimmer': 'shimmer 2s infinite',
+        'pulse-soft': 'pulseSoft 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+      },
+      keyframes: {
+        fadeIn: {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        slideUp: {
+          '0%': { transform: 'translateY(10px)', opacity: '0' },
+          '100%': { transform: 'translateY(0)', opacity: '1' },
+        },
+        slideDown: {
+          '0%': { transform: 'translateY(-10px)', opacity: '0' },
+          '100%': { transform: 'translateY(0)', opacity: '1' },
+        },
+        scaleIn: {
+          '0%': { transform: 'scale(0.95)', opacity: '0' },
+          '100%': { transform: 'scale(1)', opacity: '1' },
+        },
+        shimmer: {
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(100%)' },
+        },
+        pulseSoft: {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.5' },
+        },
+      },
+      fontFamily: {
+        'sans': ['Google Sans', 'Roboto', 'Arial', 'sans-serif'],
+      },
+    },
+  },
+  plugins: [],
+}

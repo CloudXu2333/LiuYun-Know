@@ -1,0 +1,714 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Google Sans 字体 */
+@import url('https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&display=swap');
+
+@layer base {
+  * {
+    @apply border-gemini-border;
+  }
+
+  body {
+    @apply font-sans antialiased;
+    @apply bg-gemini-bg text-gemini-text-primary;
+  }
+
+  /* 自定义滚动条 - Gemini 风格 */
+  .scrollbar-gemini::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .scrollbar-gemini::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  .scrollbar-gemini::-webkit-scrollbar-thumb {
+    @apply bg-gemini-text-tertiary/30 rounded-full;
+  }
+
+  .scrollbar-gemini::-webkit-scrollbar-thumb:hover {
+    @apply bg-gemini-text-tertiary/50;
+  }
+
+  /* 隐藏滚动条但保持功能 */
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+@layer components {
+  /* Gemini 按钮样式 */
+  .btn-gemini {
+    @apply px-6 py-3 rounded-gemini-full font-medium transition-all duration-200;
+    @apply focus:outline-none focus:ring-2 focus:ring-gemini-blue-500 focus:ring-offset-2;
+  }
+
+  .btn-gemini-primary {
+    @apply btn-gemini bg-gemini-blue-600 text-white;
+    @apply hover:bg-gemini-blue-700 hover:shadow-gemini-hover;
+    @apply active:scale-95;
+  }
+
+  .btn-gemini-secondary {
+    @apply btn-gemini bg-gemini-surface text-gemini-text-primary border border-gemini-border;
+    @apply hover:bg-gemini-bg hover:shadow-gemini;
+    @apply active:scale-95;
+  }
+
+  .btn-gemini-ghost {
+    @apply btn-gemini bg-transparent text-gemini-text-secondary;
+    @apply hover:bg-gemini-bg hover:text-gemini-text-primary;
+  }
+
+  .btn-gemini-icon {
+    @apply p-2 rounded-full transition-all duration-200;
+    @apply hover:bg-gemini-bg active:scale-95;
+    @apply focus:outline-none focus:ring-2 focus:ring-gemini-blue-500;
+  }
+
+  /* Gemini 卡片样式 */
+  .card-gemini {
+    @apply bg-gemini-surface rounded-gemini-xl border border-gemini-border;
+    @apply shadow-gemini transition-all duration-200;
+    @apply hover:shadow-gemini-hover;
+  }
+
+  /* Gemini 输入框样式 */
+  .input-gemini {
+    @apply w-full px-4 py-3 rounded-gemini-lg border border-gemini-border;
+    @apply bg-gemini-surface text-gemini-text-primary;
+    @apply focus:outline-none focus:ring-2 focus:ring-gemini-blue-500 focus:border-transparent;
+    @apply transition-all duration-200;
+    @apply placeholder:text-gemini-text-tertiary;
+  }
+
+  /* Gemini 渐变文字 */
+  .text-gradient-gemini {
+    @apply bg-gradient-gemini bg-clip-text text-transparent;
+  }
+
+  /* Gemini 头像 */
+  .avatar-gemini {
+    @apply w-10 h-10 rounded-full flex items-center justify-center;
+    @apply bg-gradient-gemini text-white font-medium;
+    @apply shadow-gemini;
+  }
+
+  /* Gemini 徽章 */
+  .badge-gemini {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+    @apply bg-gemini-blue-50 text-gemini-blue-700;
+  }
+
+  /* Gemini 分隔线 */
+  .divider-gemini {
+    @apply border-t border-gemini-border my-4;
+  }
+
+  /* Gemini 加载动画 */
+  .loading-gemini {
+    @apply inline-block w-4 h-4 border-2 border-gemini-blue-600 border-t-transparent rounded-full animate-spin;
+  }
+
+  /* Gemini 骨架屏 */
+  .skeleton-gemini {
+    @apply bg-gemini-bg animate-pulse rounded-gemini;
+  }
+
+  /* Gemini 工具提示 */
+  .tooltip-gemini {
+    @apply absolute z-50 px-3 py-2 text-sm text-white bg-gemini-text-primary rounded-gemini shadow-gemini-lg;
+    @apply opacity-0 invisible transition-all duration-200;
+  }
+
+  /* Gemini 下拉菜单 */
+  .dropdown-gemini {
+    @apply absolute z-50 mt-2 bg-gemini-surface rounded-gemini-lg shadow-gemini-xl border border-gemini-border;
+    @apply opacity-0 invisible scale-95 transition-all duration-200;
+  }
+
+  .dropdown-gemini.show {
+    @apply opacity-100 visible scale-100;
+  }
+
+  /* Gemini 模态框 */
+  .modal-gemini {
+    @apply fixed inset-0 z-50 flex items-center justify-center p-4;
+    @apply bg-black/50 backdrop-blur-sm;
+    @apply opacity-0 invisible transition-all duration-300;
+  }
+
+  .modal-gemini.show {
+    @apply opacity-100 visible;
+  }
+
+  .modal-gemini-content {
+    @apply bg-gemini-surface rounded-gemini-2xl shadow-gemini-xl;
+    @apply max-w-2xl w-full max-h-[90vh] overflow-y-auto;
+    @apply transform scale-95 transition-all duration-300;
+  }
+
+  .modal-gemini.show .modal-gemini-content {
+    @apply scale-100;
+  }
+}
+
+@layer utilities {
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes slideDown {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  @keyframes pulseSoft {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+
+  /* Gemini 动画工具类 */
+  .animate-fade-in {
+    animation: fadeIn 0.4s cubic-bezier(0.2, 0, 0.2, 1) forwards;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.4s cubic-bezier(0.2, 0, 0.2, 1) forwards;
+  }
+
+  .animate-slide-down {
+    animation: slideDown 0.3s cubic-bezier(0.2, 0, 0.2, 1) forwards;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.3s cubic-bezier(0.2, 0, 0.2, 1) forwards;
+  }
+  
+  .animate-pulse-soft {
+    animation: pulseSoft 2s infinite ease-in-out;
+  }
+
+  /* Gemini 文本截断 */
+  .truncate-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .truncate-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* Gemini 玻璃态效果 */
+  .glass-gemini {
+    @apply bg-gemini-surface/80 backdrop-blur-xl border border-gemini-border/50;
+  }
+
+  /* Gemini 悬浮效果 */
+  .hover-lift {
+    @apply transition-transform duration-200 hover:-translate-y-1;
+  }
+
+  /* Gemini 脉冲效果 */
+  .pulse-gemini {
+    @apply animate-pulse-soft;
+  }
+}
+
+/* Markdown 内容样式 - Gemini 风格增强版 */
+.markdown-gemini {
+  @apply text-gemini-text-primary leading-relaxed;
+  font-size: 15px;
+}
+
+.markdown-gemini p {
+  @apply mb-4 leading-7;
+}
+
+.markdown-gemini p:last-child {
+  @apply mb-0;
+}
+
+.markdown-gemini h1,
+.markdown-gemini h2,
+.markdown-gemini h3,
+.markdown-gemini h4,
+.markdown-gemini h5,
+.markdown-gemini h6 {
+  @apply font-bold text-gemini-text-primary mb-3 mt-6;
+}
+
+.markdown-gemini h1:first-child,
+.markdown-gemini h2:first-child,
+.markdown-gemini h3:first-child {
+  @apply mt-0;
+}
+
+.markdown-gemini h1 { @apply text-2xl; }
+.markdown-gemini h2 { @apply text-xl; }
+.markdown-gemini h3 { @apply text-lg; }
+
+.markdown-gemini ul,
+.markdown-gemini ol {
+  @apply ml-6 mb-4 space-y-1.5;
+}
+
+.markdown-gemini ul {
+  list-style-type: disc;
+}
+
+.markdown-gemini ol {
+  list-style-type: decimal;
+}
+
+.markdown-gemini li {
+  @apply leading-7;
+}
+
+.markdown-gemini li > ul,
+.markdown-gemini li > ol {
+  @apply mt-1.5 mb-0;
+}
+
+.markdown-gemini a {
+  @apply text-gemini-blue-600 hover:text-gemini-blue-700 underline decoration-gemini-blue-400;
+  @apply hover:decoration-gemini-blue-600 transition-colors;
+}
+
+.markdown-gemini a.external-link::after {
+  content: '';
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-left: 2px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%234285f4' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6'%3E%3C/path%3E%3Cpolyline points='15 3 21 3 21 9'%3E%3C/polyline%3E%3Cline x1='10' y1='14' x2='21' y2='3'%3E%3C/line%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  vertical-align: middle;
+}
+
+/* 引用来源标记样式 */
+.markdown-gemini .source-reference {
+  @apply inline-flex items-center justify-center no-underline;
+  @apply text-xs font-medium text-white;
+  @apply rounded px-1.5 py-0.5 mx-0.5;
+  @apply transition-all cursor-pointer;
+  @apply border-none outline-none;
+  min-width: 18px;
+  vertical-align: super;
+  font-size: 10px;
+  line-height: 1;
+}
+
+/* 网络来源 - 蓝色 */
+.markdown-gemini .source-reference.web-source {
+  @apply bg-gemini-blue-500 hover:bg-gemini-blue-600;
+}
+
+/* 知识库来源 - 紫色，可点击 */
+.markdown-gemini .source-reference.kb-source {
+  @apply bg-purple-500 hover:bg-purple-600;
+  @apply hover:scale-110 active:scale-95;
+  @apply shadow-sm hover:shadow;
+}
+
+.markdown-gemini .source-reference::after {
+  display: none !important;
+}
+
+/* 按钮类型的引用标记 */
+.markdown-gemini button.source-reference {
+  @apply inline-flex items-center justify-center no-underline;
+  @apply text-xs font-medium text-white;
+  @apply rounded px-1.5 py-0.5 mx-0.5;
+  @apply transition-all cursor-pointer;
+  @apply border-none outline-none;
+  min-width: 18px;
+  vertical-align: super;
+  font-size: 10px;
+  line-height: 1;
+}
+
+/* 旧版兼容 */
+.markdown-gemini a.source-reference {
+  @apply inline-flex items-center justify-center no-underline;
+  @apply text-xs font-medium text-white bg-gemini-blue-500 hover:bg-gemini-blue-600;
+  @apply rounded px-1.5 py-0.5 mx-0.5;
+  @apply transition-colors cursor-pointer;
+  min-width: 18px;
+  vertical-align: super;
+  font-size: 10px;
+}
+
+.markdown-gemini a.source-reference::after {
+  display: none;
+}
+
+.markdown-gemini strong {
+  @apply font-semibold text-gemini-text-primary;
+}
+
+.markdown-gemini em {
+  @apply italic;
+}
+
+/* 行内代码 - 排除代码块内的 code */
+.markdown-gemini code:not(.hljs):not([class*="language-"]) {
+  @apply text-sm font-mono bg-gray-100 px-1.5 py-0.5 rounded text-pink-600;
+  font-size: 0.9em;
+}
+
+/* 代码块包装器 - 现代简洁风格 */
+.markdown-gemini .code-block-wrapper {
+  @apply my-4;
+  background: #f8f9fa;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.markdown-gemini .code-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: #f1f3f5;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.markdown-gemini .code-lang-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+}
+
+.markdown-gemini .code-copy-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #6b7280;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.markdown-gemini .code-copy-btn:hover {
+  color: #374151;
+  background: #e5e7eb;
+}
+
+.markdown-gemini .code-copy-btn .hidden {
+  display: none;
+}
+
+.markdown-gemini .code-copy-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* 代码滚动容器 */
+.markdown-gemini .code-scroll-container {
+  max-height: 450px;
+  overflow: auto;
+  background: #1e1e1e;
+}
+
+/* 代码滚动容器的滚动条样式 */
+.markdown-gemini .code-scroll-container::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.markdown-gemini .code-scroll-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.markdown-gemini .code-scroll-container::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.markdown-gemini .code-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.markdown-gemini .code-scroll-container::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.markdown-gemini pre.hljs {
+  margin: 0;
+  padding: 12px 16px 12px 16px;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre;
+  overflow: visible;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', monospace;
+}
+
+.markdown-gemini pre.hljs code {
+  margin: 0;
+  padding: 0 !important;
+  background: transparent !important;
+  color: #d4d4d4 !important;
+  font-size: inherit;
+  white-space: pre;
+  display: block;
+}
+
+/* 引用块 */
+.markdown-gemini blockquote {
+  @apply border-l-4 border-gemini-blue-500 pl-4 my-4;
+  @apply text-gemini-text-secondary bg-gemini-blue-50 py-3 pr-4 rounded-r-lg;
+}
+
+.markdown-gemini blockquote p {
+  @apply mb-0;
+}
+
+/* 表格包装器 - 响应式 */
+.markdown-gemini .table-wrapper {
+  @apply my-4 overflow-x-auto rounded-lg border border-gemini-border;
+  @apply shadow-sm;
+}
+
+.markdown-gemini table {
+  @apply w-full border-collapse text-sm;
+  min-width: 400px;
+}
+
+.markdown-gemini thead {
+  @apply bg-gradient-to-r from-gray-50 to-gray-100;
+}
+
+.markdown-gemini th {
+  @apply px-4 py-3 text-left font-semibold text-gemini-text-primary;
+  @apply border-b-2 border-gemini-border;
+}
+
+.markdown-gemini td {
+  @apply px-4 py-3 text-left;
+  @apply border-b border-gemini-border;
+}
+
+.markdown-gemini tbody tr:last-child td {
+  @apply border-b-0;
+}
+
+.markdown-gemini tbody tr:hover {
+  @apply bg-gray-50;
+}
+
+/* 斑马纹效果 */
+.markdown-gemini tbody tr:nth-child(even) {
+  @apply bg-gray-50/50;
+}
+
+.markdown-gemini hr {
+  @apply my-6 border-gemini-border;
+}
+
+/* 图片样式 */
+.markdown-gemini img {
+  @apply max-w-full h-auto rounded-lg my-4;
+  @apply shadow-md;
+}
+
+/* 任务列表 */
+.markdown-gemini input[type="checkbox"] {
+  @apply mr-2 w-4 h-4 rounded;
+  @apply accent-gemini-blue-500;
+}
+
+/* 代码高亮主题 - One Dark Pro 风格 */
+.markdown-gemini .hljs {
+  background: #1e1e1e;
+}
+
+.markdown-gemini .hljs-keyword,
+.markdown-gemini .hljs-selector-tag,
+.markdown-gemini .hljs-literal,
+.markdown-gemini .hljs-section,
+.markdown-gemini .hljs-link {
+  color: #c678dd;
+}
+
+.markdown-gemini .hljs-string,
+.markdown-gemini .hljs-addition {
+  color: #98c379;
+}
+
+.markdown-gemini .hljs-title,
+.markdown-gemini .hljs-name,
+.markdown-gemini .hljs-type,
+.markdown-gemini .hljs-built_in {
+  color: #e5c07b;
+}
+
+.markdown-gemini .hljs-attribute,
+.markdown-gemini .hljs-symbol,
+.markdown-gemini .hljs-bullet,
+.markdown-gemini .hljs-variable,
+.markdown-gemini .hljs-template-tag,
+.markdown-gemini .hljs-template-variable {
+  color: #e06c75;
+}
+
+.markdown-gemini .hljs-comment,
+.markdown-gemini .hljs-quote,
+.markdown-gemini .hljs-deletion,
+.markdown-gemini .hljs-meta {
+  color: #5c6370;
+  font-style: italic;
+}
+
+.markdown-gemini .hljs-number,
+.markdown-gemini .hljs-regexp,
+.markdown-gemini .hljs-selector-id,
+.markdown-gemini .hljs-selector-class,
+.markdown-gemini .hljs-selector-attr,
+.markdown-gemini .hljs-selector-pseudo {
+  color: #d19a66;
+}
+
+.markdown-gemini .hljs-function {
+  color: #61afef;
+}
+
+.markdown-gemini .hljs-params {
+  color: #abb2bf;
+}
+
+.markdown-gemini .hljs-class .hljs-title {
+  color: #e5c07b;
+}
+
+.markdown-gemini .hljs-attr {
+  color: #d19a66;
+}
+
+.markdown-gemini .hljs-tag {
+  color: #e06c75;
+}
+
+.markdown-gemini .hljs-property {
+  color: #56b6c2;
+}
+
+
+/* ============================================
+   KaTeX 数学公式样式
+   ============================================ */
+
+/* 块级公式 */
+.markdown-gemini .katex-block {
+  @apply my-4 py-3 px-4;
+  @apply bg-gradient-to-r from-blue-50/50 to-purple-50/50;
+  @apply rounded-lg border border-blue-100;
+  @apply overflow-x-auto;
+  text-align: center;
+}
+
+.markdown-gemini .katex-block .katex {
+  font-size: 1.15em;
+}
+
+.markdown-gemini .katex-block .katex-display {
+  margin: 0;
+  padding: 0;
+}
+
+/* 行内公式 */
+.markdown-gemini .katex-inline {
+  @apply px-1;
+}
+
+.markdown-gemini .katex-inline .katex {
+  font-size: 1em;
+}
+
+/* KaTeX 错误样式 */
+.markdown-gemini .katex-error {
+  @apply text-red-500 bg-red-50 px-2 py-1 rounded;
+  @apply font-mono text-sm;
+  @apply border border-red-200;
+}
+
+/* KaTeX 基础样式覆盖 */
+.markdown-gemini .katex {
+  font-size: 1.1em;
+  line-height: 1.5;
+}
+
+/* 确保公式在深色背景下也清晰 */
+.markdown-gemini .katex .mord,
+.markdown-gemini .katex .mop,
+.markdown-gemini .katex .mbin,
+.markdown-gemini .katex .mrel,
+.markdown-gemini .katex .mopen,
+.markdown-gemini .katex .mclose,
+.markdown-gemini .katex .mpunct,
+.markdown-gemini .katex .minner {
+  color: #1f2937;
+}
+
+/* 公式滚动条样式 */
+.markdown-gemini .katex-block::-webkit-scrollbar {
+  height: 4px;
+}
+
+.markdown-gemini .katex-block::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+.markdown-gemini .katex-block::-webkit-scrollbar-thumb {
+  @apply bg-blue-200 rounded-full;
+}
+
+.markdown-gemini .katex-block::-webkit-scrollbar-thumb:hover {
+  @apply bg-blue-300;
+}
+
+/* 响应式：小屏幕上公式可滚动 */
+@media (max-width: 640px) {
+  .markdown-gemini .katex-block {
+    @apply text-sm;
+  }
+  
+  .markdown-gemini .katex-block .katex {
+    font-size: 1em;
+  }
+}

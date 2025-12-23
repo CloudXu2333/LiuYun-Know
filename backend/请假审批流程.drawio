@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" agent="MCP Server">
+  <diagram name="Page-1" id="page1">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1000" pageHeight="1200">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="请假审批流程" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="200" y="10" width="500" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="start" value="开始" style="ellipse;whiteSpace=wrap;html=1;;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="400" y="80" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="apply" value="员工提交请假申请" style="shape=parallelogram;whiteSpace=wrap;html=1;;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="400" y="200" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="check_requirements" value="检查申请信息完整性" style="rhombus;whiteSpace=wrap;html=1;;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="400" y="320" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="return_modify" value="返回修改" style="whiteSpace=wrap;html=1;;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="150" y="440" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="direct_approval" value="直接主管审批" style="whiteSpace=wrap;html=1;;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="400" y="560" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="direct_decision" value="主管审批决定" style="rhombus;whiteSpace=wrap;html=1;;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="400" y="680" width="160" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="reject1" value="审批拒绝" style="whiteSpace=wrap;html=1;;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="150" y="800" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="hr_approval" value="HR部门审批" style="whiteSpace=wrap;html=1;;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="650" y="800" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="hr_decision" value="HR审批决定" style="rhombus;whiteSpace=wrap;html=1;;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="650" y="920" width="160" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="reject2" value="审批拒绝" style="whiteSpace=wrap;html=1;;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="400" y="1040" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="final_approval" value="最终审批通过" style="whiteSpace=wrap;html=1;;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="900" y="1040" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="update_system" value="更新考勤系统" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="900" y="1160" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="notify_employee" value="通知员工结果" style="whiteSpace=wrap;html=1;;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="900" y="1280" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="end" value="结束" style="ellipse;whiteSpace=wrap;html=1;;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="900" y="1400" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="notify_reject" value="通知员工拒绝" style="whiteSpace=wrap;html=1;;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="400" y="1160" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="end_reject" value="结束" style="ellipse;whiteSpace=wrap;html=1;;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="400" y="1280" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_0"  style="html=1;edgeStyle=orthogonalEdgeStyle;strokeColor=#333333;strokeWidth=2;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;labelBackgroundColor=#ffffff;fontSize=11;" edge="1" parent="1" source="start" target="apply">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_1"  style="html=1;edgeStyle=orthogonalEdgeStyle;strokeColor=#333333;strokeWidth=2;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;labelBackgroundColor=#ffffff;fontSize=11;" edge="1" parent="1" source="apply" target="check_requirements">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_2" value="不完整" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#333333;strokeWidth=2;endArrow=classic;exitX=0;exitY=0.5;entryX=1;entryY=0.5;jettySize=auto;orthogonalLoop=1;labelBackgroundColor=#ffffff;fontSize=11;" edge="1" parent="1" source="check_requirements" target="return_modify">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_3" value="完整" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#333333;strokeWidth=2;endArrow=classic;exitX=1;exitY=1;entryX=0.5;entryY=0;labelBackgroundColor=#ffffff;fontSize=11;" edge="1" parent="1" source="check_requirements" target="direct_approval">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_4"  style="html=1;edgeStyle=orthogonalEdgeStyle;curved=1;dashed=1;strokeColor=#333333;strokeWidth=2;endArrow=classic;exitX=0;exitY=0.5;entryX=0;entryY=0.5;jettySize=auto;orthogonalLoop=1;labelBackgroundColor=#ffffff;fontSize=11;" edge="1" parent="1" source="return_modify" target="apply">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_5"  style="html=1;edgeStyle=orthogonalEdgeStyle;strokeColor=#333333;strokeWidth=2;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;labelBackgroundColor=#ffffff;fontSize=11;" edge="1" parent="1" source="direct_approval" target="direct_decision">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_6" value="拒绝" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#333333;strokeWidth=2;endArrow=classic;exitX=0;exitY=0.5;entryX=1;entryY=0.5;jettySize=auto;orthogonalLoop=1;labelBackgroundColor=#ffffff;fontSize=11;" edge="1" parent="1" source="direct_decision" target="reject1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_7" value="通过" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#333333;strokeWidth=2;endArrow=classic;exitX=1;exitY=0.5;entryX=0;entryY=0.5;jettySize=auto;orthogonalLoop=1;labelBackgroundColor=#ffffff;fontSize=11;" edge="1" parent="1" source="direct_decision" target="hr_approval">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_8"  style="html=1;edgeStyle=orthogonalEdgeStyle;strokeColor=#333333;strokeWidth=2;endArrow=classic;exitX=1;exitY=0.5;entryX=0;entryY=0.5;jettySize=auto;orthogonalLoop=1;labelBackgroundColor=#ffffff;fontSize=11;" edge="1" parent="1" source="reject1" target="notify_reject">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_9"  style="html=1;edgeStyle=orthogonalEdgeStyle;strokeColor=#333333;strokeWidth=2;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;labelBackgroundColor=#ffffff;fontSize=11;" edge="1" parent="1" source="hr_approval" target="hr_decision">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_10" value="拒绝" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#333333;strokeWidth=2;endArrow=classic;exitX=0;exitY=0.5;entryX=1;entryY=0.5;jettySize=auto;orthogonalLoop=1;labelBackgroundColor=#ffffff;fontSize=11;" edge="1" parent="1" source="hr_decision" target="reject2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_11" value="通过" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#333333;strokeWidth=2;endArrow=classic;exitX=1;exitY=0.5;entryX=0;entryY=0.5;jettySize=auto;orthogonalLoop=1;labelBackgroundColor=#ffffff;fontSize=11;" edge="1" parent="1" source="hr_decision" target="final_approval">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_12"  style="html=1;edgeStyle=orthogonalEdgeStyle;strokeColor=#333333;strokeWidth=2;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;labelBackgroundColor=#ffffff;fontSize=11;" edge="1" parent="1" source="reject2" target="notify_reject">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_13"  style="html=1;edgeStyle=orthogonalEdgeStyle;strokeColor=#333333;strokeWidth=2;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;labelBackgroundColor=#ffffff;fontSize=11;" edge="1" parent="1" source="final_approval" target="update_system">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_14"  style="html=1;edgeStyle=orthogonalEdgeStyle;strokeColor=#333333;strokeWidth=2;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;labelBackgroundColor=#ffffff;fontSize=11;" edge="1" parent="1" source="update_system" target="notify_employee">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_15"  style="html=1;edgeStyle=orthogonalEdgeStyle;strokeColor=#333333;strokeWidth=2;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;labelBackgroundColor=#ffffff;fontSize=11;" edge="1" parent="1" source="notify_employee" target="end">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_16"  style="html=1;edgeStyle=orthogonalEdgeStyle;strokeColor=#333333;strokeWidth=2;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;labelBackgroundColor=#ffffff;fontSize=11;" edge="1" parent="1" source="notify_reject" target="end_reject">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

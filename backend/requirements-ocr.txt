@@ -1,0 +1,12 @@
+# 可选：OCR 相关依赖（Windows 建议 Python 3.10/3.11）
+#
+# 说明：
+# - paddleocr==2.7.0.3 依赖 PyMuPDF<1.21.0
+# - 在 Python 3.12 + Windows 下，PyMuPDF<1.21.0 往往没有可用 wheel，容易触发源码构建失败
+# - 因此推荐使用 Python 3.10/3.11 创建虚拟环境后再安装本文件
+
+paddlepaddle==2.6.2
+paddleocr==2.7.0.3
+PyMuPDF<1.21.0
+
+
