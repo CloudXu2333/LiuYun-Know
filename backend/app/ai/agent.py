@@ -1,6 +1,6 @@
 """
 LangGraph Agent 核心逻辑
-实现基于状态图的对话 Agent
+实现基于状态图的对话 Agent，支持流式输出和 MCP 工具调用
 """
 import json
 from typing import TypedDict, Annotated, Sequence, Optional, List, Dict, Any, AsyncGenerator
@@ -8,6 +8,7 @@ from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, System
 from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
 import operator
+import asyncio
 
 from app.ai.llm_manager import llm_manager
 from app.ai.tools import (
@@ -41,6 +42,14 @@ class AgentState(TypedDict):
     model: str
     api_key: Optional[str]
     base_url: Optional[str]
+    # 上下文管理配置
+    max_context_tokens: int
+    db: Any  # 数据库会话
+    user_id: Optional[str]
+    memory_top_k: int
+    core_memory_threshold: int
+    # 流式输出队列（用于在节点间传递流式内容）
+    stream_queue: Optional[asyncio.Queue]
 
 
 class ConversationAgent:
@@ -96,6 +105,13 @@ class ConversationAgent:
         thinking_steps = list(state.get("thinking_steps", []))
         thinking_steps.append("正在分析问题...")
         
+        # 如果有流式队列，发送思考步骤
+        if state.get("stream_queue"):
+            await state["stream_queue"].put({
+                "type": "thinking_step",
+                "step": "正在分析问题..."
+            })
+        
         return {"thinking_steps": thinking_steps}
     
     def _route_after_analyze(self, state: AgentState) -> str:
@@ -112,30 +128,95 @@ class ConversationAgent:
     async def _web_search_node(self, state: AgentState) -> Dict[str, Any]:
         """联网搜索节点"""
         thinking_steps = list(state.get("thinking_steps", []))
-        thinking_steps.append("正在联网搜索...")
+        stream_queue = state.get("stream_queue")
+        
+        # 发送搜索开始事件
+        if stream_queue:
+            await stream_queue.put({"type": "search_start"})
+        
+        # 使用 AI 分析历史对话，提取搜索关键词
+        history_messages = []
+        for msg in state.get("messages", []):
+            if isinstance(msg, HumanMessage):
+                history_messages.append({"role": "user", "content": msg.content})
+            elif isinstance(msg, AIMessage):
+                history_messages.append({"role": "assistant", "content": msg.content})
+        
+        search_query = await self._extract_search_query(
+            user_query=state["user_query"],
+            history_messages=history_messages,
+            model=state.get("model", "deepseek-chat"),
+            api_key=state.get("api_key"),
+            base_url=state.get("base_url")
+        )
+        
+        step = f"正在搜索: {search_query}"
+        thinking_steps.append(step)
+        if stream_queue:
+            await stream_queue.put({"type": "thinking_step", "step": step})
         
         try:
-            result = await web_search_tool.ainvoke({
-                "query": state["user_query"],
-                "max_results": 5
-            })
+            from app.services.web_search_service import web_search_service
             
-            if result.get("success") and result.get("results"):
-                results = result["results"]
-                thinking_steps.append(f"✓ 搜索完成，获取到 {len(results)} 条结果")
-                return {
-                    "web_search_results": results,
-                    "thinking_steps": thinking_steps
-                }
+            if web_search_service.enabled:
+                response = await web_search_service.search(
+                    query=search_query,
+                    max_results=5,
+                    use_tavily=True,
+                    use_firecrawl=True
+                )
+                
+                if response.results:
+                    top_results = web_search_service._select_top_results(
+                        response.results, state["user_query"], limit=5
+                    )
+                    
+                    results = [
+                        {
+                            "url": r.url,
+                            "title": r.title,
+                            "snippet": r.snippet[:200] if len(r.snippet) > 200 else r.snippet
+                        }
+                        for r in top_results
+                    ]
+                    
+                    step = f"✓ 搜索完成，获取到 {len(results)} 条结果"
+                    thinking_steps.append(step)
+                    if stream_queue:
+                        await stream_queue.put({"type": "thinking_step", "step": step})
+                        await stream_queue.put({"type": "search_complete", "sources": results})
+                    
+                    return {
+                        "web_search_results": results,
+                        "thinking_steps": thinking_steps
+                    }
+                else:
+                    error = response.errors[0] if response.errors else "未找到相关结果"
+                    step = f"⚠ 联网搜索：{error}"
+                    thinking_steps.append(step)
+                    if stream_queue:
+                        await stream_queue.put({"type": "thinking_step", "step": step})
+                        await stream_queue.put({"type": "search_complete", "sources": []})
+                    return {
+                        "web_search_results": [],
+                        "thinking_steps": thinking_steps
+                    }
             else:
-                error = result.get("error", "未找到相关结果")
-                thinking_steps.append(f"⚠ 联网搜索：{error}")
+                step = "⚠ 联网搜索服务未启用"
+                thinking_steps.append(step)
+                if stream_queue:
+                    await stream_queue.put({"type": "thinking_step", "step": step})
+                    await stream_queue.put({"type": "search_complete", "sources": []})
                 return {
                     "web_search_results": [],
                     "thinking_steps": thinking_steps
                 }
         except Exception as e:
-            thinking_steps.append(f"⚠ 搜索出错: {str(e)[:50]}")
+            step = f"⚠ 搜索出错: {str(e)[:50]}"
+            thinking_steps.append(step)
+            if stream_queue:
+                await stream_queue.put({"type": "thinking_step", "step": step})
+                await stream_queue.put({"type": "search_error", "error": str(e)})
             return {
                 "web_search_results": [],
                 "thinking_steps": thinking_steps
@@ -151,10 +232,14 @@ class ConversationAgent:
         """知识库查询节点"""
         thinking_steps = list(state.get("thinking_steps", []))
         kb_name = state.get("kb_name", "知识库")
-        thinking_steps.append(f"正在查询知识库「{kb_name}」...")
+        stream_queue = state.get("stream_queue")
+        
+        step = f"正在查询知识库「{kb_name}」..."
+        thinking_steps.append(step)
+        if stream_queue:
+            await stream_queue.put({"type": "thinking_step", "step": step})
         
         try:
-            # 直接调用 lightrag_service，因为 tool 需要额外参数
             from app.services.lightrag_service import lightrag_service
             
             response = await lightrag_service.query_with_sources(
@@ -171,29 +256,48 @@ class ConversationAgent:
             rel_count = len(graph_data.get('relationships', []))
             chunk_count = len(chunks)
             
-            thinking_steps.append(
-                f"✓ 检索到 {entity_count} 个实体、{rel_count} 个关系、{chunk_count} 个文档片段"
-            )
+            step = f"✓ 检索到 {entity_count} 个实体、{rel_count} 个关系、{chunk_count} 个文档片段"
+            thinking_steps.append(step)
+            if stream_queue:
+                await stream_queue.put({"type": "thinking_step", "step": step})
+            
+            kb_results = {
+                "kb_name": kb_name,
+                "context": response.get('context', ''),
+                "graph_data": graph_data,
+                "chunks": chunks
+            }
+            
+            # 发送知识库来源
+            if stream_queue:
+                kb_sources = {
+                    "kb_name": kb_name,
+                    "graph_data": graph_data,
+                    "chunks": [
+                        {"index": idx + 1, "content": c.get("content", "")}
+                        for idx, c in enumerate(chunks[:10])
+                    ]
+                }
+                await stream_queue.put({"type": "kb_sources", "sources": kb_sources})
             
             return {
-                "kb_results": {
-                    "kb_name": kb_name,
-                    "context": response.get('context', ''),
-                    "graph_data": graph_data,
-                    "chunks": chunks
-                },
+                "kb_results": kb_results,
                 "thinking_steps": thinking_steps
             }
         except Exception as e:
-            thinking_steps.append(f"⚠ 知识库查询出错: {str(e)[:50]}")
+            step = f"⚠ 知识库查询出错: {str(e)[:50]}"
+            thinking_steps.append(step)
+            if stream_queue:
+                await stream_queue.put({"type": "thinking_step", "step": step})
             return {
                 "kb_results": {},
                 "thinking_steps": thinking_steps
             }
     
     async def _generate_node(self, state: AgentState) -> Dict[str, Any]:
-        """生成回复节点"""
+        """生成回复节点 - 支持流式输出"""
         thinking_steps = list(state.get("thinking_steps", []))
+        stream_queue = state.get("stream_queue")
         
         # 构建系统提示词
         system_prompt = state.get("system_prompt", "你是一个有帮助的AI助手。请用中文回答问题。")
@@ -201,7 +305,10 @@ class ConversationAgent:
         # 添加联网搜索上下文
         web_results = state.get("web_search_results", [])
         if web_results:
-            web_context = format_web_search_context(web_results)
+            web_context = format_web_search_context([
+                {"title": s["title"], "url": s["url"], "snippet": s["snippet"]}
+                for s in web_results
+            ])
             system_prompt = f"{system_prompt}\n\n{web_context}"
         
         # 添加知识库上下文
@@ -222,45 +329,109 @@ class ConversationAgent:
         if web_results:
             context_info.append(f"{len(web_results)}个网络来源")
         
-        if context_info:
-            context_str = "、".join(context_info)
-            thinking_steps.append(f"已整合上下文：{context_str}")
-        
-        model = state.get("model", "deepseek-chat")
-        thinking_steps.append(f"正在使用 {model} 生成回答...")
-        
-        # 构建消息
-        messages = [{"role": "system", "content": system_prompt}]
-        
-        # 添加历史消息
+        history_messages = []
         for msg in state.get("messages", []):
             if isinstance(msg, HumanMessage):
-                messages.append({"role": "user", "content": msg.content})
+                history_messages.append({"role": "user", "content": msg.content})
             elif isinstance(msg, AIMessage):
-                messages.append({"role": "assistant", "content": msg.content})
+                history_messages.append({"role": "assistant", "content": msg.content})
         
-        # 添加当前问题
-        messages.append({"role": "user", "content": state["user_query"]})
+        if history_messages:
+            context_info.append(f"{len(history_messages)}条历史对话")
         
-        # 调用 LLM（非流式，用于获取完整回复）
-        try:
-            response = await llm_manager.chat_completion(
-                messages=messages,
-                model=model,
-                api_key=state.get("api_key"),
-                base_url=state.get("base_url"),
-                stream=False
-            )
+        if context_info:
+            context_str = "、".join(context_info)
+            step = f"已整合上下文：{context_str}"
+            thinking_steps.append(step)
+            if stream_queue:
+                await stream_queue.put({"type": "thinking_step", "step": step})
+        
+        model = state.get("model", "deepseek-chat")
+        step = f"正在使用 {model} 生成回答..."
+        thinking_steps.append(step)
+        if stream_queue:
+            await stream_queue.put({"type": "thinking_step", "step": step})
+        
+        # 使用上下文管理器构建消息列表
+        from app.ai.context_manager import context_manager
+        
+        context_result = await context_manager.build_context(
+            system_prompt=system_prompt,
+            history_messages=history_messages,
+            current_query=state["user_query"],
+            max_tokens=state.get("max_context_tokens", 16000),
+            model=model,
+            api_key=state.get("api_key"),
+            base_url=state.get("base_url"),
+            db=state.get("db"),
+            user_id=state.get("user_id"),
+            memory_top_k=state.get("memory_top_k", 5),
+            core_memory_threshold=state.get("core_memory_threshold", 80)
+        )
+        
+        llm_messages = context_result["messages"]
+        
+        # 发送上下文信息
+        if stream_queue:
+            context_info_data = {
+                "total_tokens": context_result["total_tokens"],
+                "compressed": context_result["compressed"],
+                "original_count": context_result["original_count"],
+                "final_count": context_result["final_count"],
+                "long_term_memory_included": context_result.get("long_term_memory_included", False)
+            }
+            await stream_queue.put({"type": "context_info", "info": context_info_data})
             
-            final_response = response.choices[0].message.content
+            # 如果包含长期记忆，发送记忆详情
+            if context_result.get("long_term_memory_included"):
+                memories = context_result.get("long_term_memories", [])
+                core_count = context_result.get("core_memory_count", 0)
+                normal_count = context_result.get("normal_memory_count", 0)
+                step = f"📚 已加载用户长期记忆（核心记忆 {core_count} 条 + 相关记忆 {normal_count} 条）"
+                thinking_steps.append(step)
+                await stream_queue.put({"type": "thinking_step", "step": step})
+                await stream_queue.put({"type": "memory_sources", "memories": memories})
+            
+            # 如果进行了压缩，添加思考步骤
+            if context_result["compressed"]:
+                step = f"📝 历史消息已压缩（{context_result['original_count']}条→{context_result['final_count']}条摘要）"
+                thinking_steps.append(step)
+                await stream_queue.put({"type": "thinking_step", "step": step})
+        
+        # 流式生成回复
+        final_response = ""
+        try:
+            if stream_queue:
+                # 流式模式：逐 token 输出
+                async for chunk in llm_manager.chat_completion_stream(
+                    messages=llm_messages,
+                    model=model,
+                    api_key=state.get("api_key"),
+                    base_url=state.get("base_url")
+                ):
+                    final_response += chunk
+                    await stream_queue.put({"type": "content", "content": chunk})
+            else:
+                # 非流式模式：一次性返回
+                response = await llm_manager.chat_completion(
+                    messages=llm_messages,
+                    model=model,
+                    api_key=state.get("api_key"),
+                    base_url=state.get("base_url"),
+                    stream=False
+                )
+                final_response = response.choices[0].message.content
             
             return {
                 "final_response": final_response,
                 "thinking_steps": thinking_steps
             }
         except Exception as e:
+            error_msg = f"生成回复时出错: {str(e)}"
+            if stream_queue:
+                await stream_queue.put({"type": "error", "error": str(e)})
             return {
-                "final_response": f"生成回复时出错: {str(e)}",
+                "final_response": error_msg,
                 "thinking_steps": thinking_steps
             }
     
@@ -301,7 +472,7 @@ class ConversationAgent:
         prompt = f"""请根据用户的问题和对话历史，提取最适合用于网络搜索的关键词。
 
 要求：
-1. 关键词应该简洁、精准，适合搜索引擎
+1. 关键词应该简洁、精准，适合搜索引擎 
 2. 如果问题中有指代词（如"它"、"这个"），请根据上下文替换为具体内容
 3. 只返回搜索关键词，不要其他解释
 4. 关键词长度控制在50字以内
@@ -435,20 +606,13 @@ class ConversationAgent:
         base_url: str = None,
         system_prompt: str = None,
         max_context_tokens: int = 16000,
-        db = None,  # 数据库会话（用于获取长期记忆）
-        user_id: str = None,  # 用户 ID（用于获取长期记忆）
-        memory_top_k: int = 5,  # 普通记忆检索数量
-        core_memory_threshold: int = 80  # 核心记忆优先级阈值
+        db = None,
+        user_id: str = None,
+        memory_top_k: int = 5,
+        core_memory_threshold: int = 80
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """
-        流式运行 Agent
-        
-        Args:
-            max_context_tokens: 最大上下文 token 数，超过时自动压缩旧消息
-            db: 数据库会话（用于获取长期记忆）
-            user_id: 用户 ID（用于获取长期记忆）
-            memory_top_k: 普通记忆检索数量（用户可配置）
-            core_memory_threshold: 核心记忆优先级阈值（用户可配置）
+        流式运行 Agent（使用 LangGraph）
         
         Yields:
             事件字典，包含 type 和相关数据
@@ -458,9 +622,11 @@ class ConversationAgent:
             - {"type": "kb_sources", "sources": Dict}
             - {"type": "content", "content": str}
             - {"type": "context_info", "info": Dict}
+            - {"type": "memory_sources", "memories": List}
             - {"type": "done", "model": str, "sources": Dict}
         """
-        from app.ai.context_manager import context_manager
+        # 创建流式输出队列
+        stream_queue = asyncio.Queue()
         
         # 转换历史消息
         messages = []
@@ -473,224 +639,70 @@ class ConversationAgent:
                 elif role == "assistant":
                     messages.append(AIMessage(content=content))
         
-        thinking_steps = []
-        web_sources = []
-        kb_sources = None
-        
-        # Step 1: 分析问题
-        thinking_steps.append("正在分析问题...")
-        yield {"type": "thinking_step", "step": "正在分析问题..."}
-        
-        # Step 2: 联网搜索（如果启用）
-        if enable_web_search:
-            yield {"type": "search_start"}
-            
-            # 使用 AI 分析历史对话，提取搜索关键词
-            search_query = await self._extract_search_query(
-                user_query=user_query,
-                history_messages=history_messages,
-                model=model,
-                api_key=api_key,
-                base_url=base_url
-            )
-            
-            step = f"正在搜索: {search_query}"
-            thinking_steps.append(step)
-            yield {"type": "thinking_step", "step": step}
-            
-            try:
-                from app.services.web_search_service import web_search_service
-                
-                if web_search_service.enabled:
-                    response = await web_search_service.search(
-                        query=search_query,
-                        max_results=5,
-                        use_tavily=True,
-                        use_firecrawl=True
-                    )
-                    
-                    if response.results:
-                        top_results = web_search_service._select_top_results(
-                            response.results, user_query, limit=5
-                        )
-                        
-                        step = f"✓ 搜索完成，获取到 {len(top_results)} 条结果"
-                        thinking_steps.append(step)
-                        yield {"type": "thinking_step", "step": step}
-                        
-                        web_sources = [
-                            {
-                                "url": r.url,
-                                "title": r.title,
-                                "snippet": r.snippet[:200] if len(r.snippet) > 200 else r.snippet
-                            }
-                            for r in top_results
-                        ]
-                        
-                        yield {"type": "search_complete", "sources": web_sources}
-                    else:
-                        error_msg = response.errors[0] if response.errors else "未找到相关结果"
-                        step = f"⚠ 联网搜索：{error_msg}"
-                        thinking_steps.append(step)
-                        yield {"type": "thinking_step", "step": step}
-                        yield {"type": "search_complete", "sources": []}
-                else:
-                    step = "⚠ 联网搜索服务未启用"
-                    thinking_steps.append(step)
-                    yield {"type": "thinking_step", "step": step}
-                    yield {"type": "search_complete", "sources": []}
-                    
-            except Exception as e:
-                step = f"⚠ 搜索出错: {str(e)[:50]}"
-                thinking_steps.append(step)
-                yield {"type": "thinking_step", "step": step}
-                yield {"type": "search_error", "error": str(e)}
-        
-        # Step 3: 知识库查询（如果有）
-        if kb_working_dir:
-            step = f"正在查询知识库「{kb_name or '知识库'}」..."
-            thinking_steps.append(step)
-            yield {"type": "thinking_step", "step": step}
-            
-            try:
-                from app.services.lightrag_service import lightrag_service
-                
-                response = await lightrag_service.query_with_sources(
-                    working_dir=kb_working_dir,
-                    query_text=user_query,
-                    mode="mix",
-                    top_k=5
-                )
-                
-                graph_data = response.get('graph_data', {})
-                chunks = response.get('chunks', [])
-                
-                entity_count = len(graph_data.get('entities', []))
-                rel_count = len(graph_data.get('relationships', []))
-                chunk_count = len(chunks)
-                
-                step = f"✓ 检索到 {entity_count} 个实体、{rel_count} 个关系、{chunk_count} 个文档片段"
-                thinking_steps.append(step)
-                yield {"type": "thinking_step", "step": step}
-                
-                kb_sources = {
-                    "kb_name": kb_name or "知识库",
-                    "graph_data": graph_data,
-                    "chunks": [
-                        {"index": idx + 1, "content": c.get("content", "")}
-                        for idx, c in enumerate(chunks[:10])
-                    ]
-                }
-                
-                yield {"type": "kb_sources", "sources": kb_sources}
-                
-            except Exception as e:
-                step = f"⚠ 知识库查询出错: {str(e)[:50]}"
-                thinking_steps.append(step)
-                yield {"type": "thinking_step", "step": step}
-        
-        # Step 4: 构建上下文并生成回复
-        final_system_prompt = system_prompt or "你是一个有帮助的AI助手。请用中文回答问题。"
-        
-        # 添加联网搜索上下文
-        if web_sources:
-            web_context = format_web_search_context([
-                {"title": s["title"], "url": s["url"], "snippet": s["snippet"]}
-                for s in web_sources
-            ])
-            final_system_prompt = f"{final_system_prompt}\n\n{web_context}"
-        
-        # 添加知识库上下文
-        if kb_sources and (kb_sources.get("chunks") or kb_sources.get("graph_data", {}).get("entities")):
-            kb_context = format_kb_context(
-                kb_sources.get("kb_name", "知识库"),
-                kb_sources.get("chunks", []),
-                kb_sources.get("graph_data", {})
-            )
-            if kb_context:
-                final_system_prompt = f"{final_system_prompt}\n\n{kb_context}"
-        
-        # 构建上下文信息提示
-        context_info = []
-        if kb_sources:
-            context_info.append("知识库内容")
-        if web_sources:
-            context_info.append(f"{len(web_sources)}个网络来源")
-        if history_messages and len(history_messages) > 0:
-            context_info.append(f"{len(history_messages)}条历史对话")
-        
-        if context_info:
-            context_str = "、".join(context_info)
-            step = f"已整合上下文：{context_str}"
-            thinking_steps.append(step)
-            yield {"type": "thinking_step", "step": step}
-        
-        step = f"正在使用 {model} 生成回答..."
-        thinking_steps.append(step)
-        yield {"type": "thinking_step", "step": step}
-        
-        # 使用上下文管理器构建消息列表（自动处理 token 限制、压缩和长期记忆）
-        context_result = await context_manager.build_context(
-            system_prompt=final_system_prompt,
-            history_messages=history_messages or [],
-            current_query=user_query,
-            max_tokens=max_context_tokens,
-            model=model,
-            api_key=api_key,
-            base_url=base_url,
-            db=db,
-            user_id=user_id,
-            memory_top_k=memory_top_k,
-            core_memory_threshold=core_memory_threshold
-        )
-        
-        llm_messages = context_result["messages"]
-        
-        # 发送上下文信息
-        context_info_data = {
-            "total_tokens": context_result["total_tokens"],
-            "compressed": context_result["compressed"],
-            "original_count": context_result["original_count"],
-            "final_count": context_result["final_count"],
-            "long_term_memory_included": context_result.get("long_term_memory_included", False)
+        # 初始状态
+        initial_state: AgentState = {
+            "messages": messages,
+            "user_query": user_query,
+            "system_prompt": system_prompt or "你是一个有帮助的AI助手。请用中文回答问题。",
+            "enable_web_search": enable_web_search,
+            "kb_working_dir": kb_working_dir,
+            "kb_name": kb_name,
+            "web_search_results": [],
+            "kb_results": {},
+            "thinking_steps": [],
+            "final_response": "",
+            "model": model,
+            "api_key": api_key,
+            "base_url": base_url,
+            "max_context_tokens": max_context_tokens,
+            "db": db,
+            "user_id": user_id,
+            "memory_top_k": memory_top_k,
+            "core_memory_threshold": core_memory_threshold,
+            "stream_queue": stream_queue
         }
-        yield {"type": "context_info", "info": context_info_data}
         
-        # 如果包含长期记忆，添加思考步骤并发送记忆详情
-        if context_result.get("long_term_memory_included"):
-            memories = context_result.get("long_term_memories", [])
-            core_count = context_result.get("core_memory_count", 0)
-            normal_count = context_result.get("normal_memory_count", 0)
-            step = f"📚 已加载用户长期记忆（核心记忆 {core_count} 条 + 相关记忆 {normal_count} 条）"
-            thinking_steps.append(step)
-            yield {"type": "thinking_step", "step": step}
-            # 发送长时记忆来源
-            yield {"type": "memory_sources", "memories": memories}
+        # 创建异步任务运行图
+        async def run_graph():
+            try:
+                final_state = await self.graph.ainvoke(initial_state)
+                # 图执行完成，发送结束信号
+                done_data = {"type": "done", "model": model}
+                kb_results = final_state.get("kb_results", {})
+                if kb_results:
+                    done_data["sources"] = {
+                        "kb_name": kb_results.get("kb_name", ""),
+                        "graph_data": kb_results.get("graph_data", {}),
+                        "chunks": [
+                            {"index": idx + 1, "content": c.get("content", "")}
+                            for idx, c in enumerate(kb_results.get("chunks", [])[:10])
+                        ]
+                    }
+                await stream_queue.put(done_data)
+            except Exception as e:
+                await stream_queue.put({"type": "error", "error": str(e)})
+            finally:
+                # 发送结束标记
+                await stream_queue.put(None)
         
-        # 如果进行了压缩，添加思考步骤
-        if context_result["compressed"]:
-            step = f"📝 历史消息已压缩（{context_result['original_count']}条→{context_result['final_count']}条摘要）"
-            thinking_steps.append(step)
-            yield {"type": "thinking_step", "step": step}
+        # 启动图执行任务
+        graph_task = asyncio.create_task(run_graph())
         
-        # 流式生成回复
+        # 从队列中读取并 yield 事件
         try:
-            async for chunk in llm_manager.chat_completion_stream(
-                messages=llm_messages,
-                model=model,
-                api_key=api_key,
-                base_url=base_url
-            ):
-                yield {"type": "content", "content": chunk}
-        except Exception as e:
-            yield {"type": "error", "error": str(e)}
-            return
-        
-        # 完成
-        done_data = {"type": "done", "model": model}
-        if kb_sources:
-            done_data["sources"] = kb_sources
-        yield done_data
+            while True:
+                event = await stream_queue.get()
+                if event is None:  # 结束标记
+                    break
+                yield event
+        finally:
+            # 确保任务完成
+            if not graph_task.done():
+                graph_task.cancel()
+                try:
+                    await graph_task
+                except asyncio.CancelledError:
+                    pass
 
 
 # 创建全局 Agent 实例

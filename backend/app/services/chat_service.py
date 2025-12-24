@@ -119,7 +119,7 @@ class ChatService:
     ) -> int:
         """获取对话的消息总数"""
         from sqlalchemy import func
-        conversation_id_str = str(conversation_id)
+        conversation_id_str = str(conversation_id) 
         result = await db.execute(
             select(func.count(Message.id))
             .where(Message.conversation_id == conversation_id_str)

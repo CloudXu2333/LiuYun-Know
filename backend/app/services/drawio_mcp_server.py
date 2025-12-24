@@ -320,8 +320,13 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
         # 生成 XML
         xml_content = generate_drawio_xml(title, nodes, edges)
         
-        # 保存文件
-        filepath = f"{filename}.drawio"
+        # 确保 diagrams 目录存在
+        import os
+        diagrams_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "diagrams")
+        os.makedirs(diagrams_dir, exist_ok=True)
+        
+        # 保存文件到 diagrams 目录
+        filepath = os.path.join(diagrams_dir, f"{filename}.drawio")
         with open(filepath, 'w', encoding='utf-8') as f:
             f.write(xml_content)
         

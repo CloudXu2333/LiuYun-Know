@@ -91,3 +91,7 @@ tmp/
 aaa.md
 *.docx
 
+# 生成的流程图文件
+backend/diagrams/*.drawio
+!backend/diagrams/.gitkeep
+
