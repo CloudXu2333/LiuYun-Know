@@ -649,16 +649,19 @@
                       </div>
                       
                       <!-- Firecrawl 高级选项 -->
-                      <div v-if="webSearchConfig.use_firecrawl" class="space-y-1">
+                      <div v-if="webSearchConfig.use_firecrawl" class="space-y-2">
                         <label class="block text-xs text-gray-600 mb-1">Firecrawl 模式</label>
-                        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                        <label class="flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
                           <input
                             v-model="webSearchConfig.firecrawl_scrape_content"
                             type="checkbox"
-                            class="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                            class="w-4 h-4 mt-0.5 text-green-600 border-gray-300 rounded focus:ring-green-500"
                           />
-                          <span>抓取页面内容</span>
-                          <span class="text-xs text-gray-400">（更详细但更慢）</span>
+                          <div>
+                            <span>抓取页面内容</span>
+                            <p class="text-xs text-gray-400 mt-0.5">关闭：只获取搜索摘要，速度快</p>
+                            <p class="text-xs text-gray-400">开启：访问网页读取全文，更详细但更慢</p>
+                          </div>
                         </label>
                       </div>
                       
@@ -1630,9 +1633,10 @@ const loadConversation = async (id) => {
       role: msg.role,
       // 过滤掉知识库上下文前缀，只显示用户原始问题
       content: msg.role === 'user' ? extractUserQuestion(msg.content) : msg.content,
-      // 恢复元数据（webSources, sources, thinkingSteps 等）
+      // 恢复元数据（webSources, sources, memorySources, thinkingSteps 等）
       webSources: msg.metadata?.web_sources || [],
       sources: msg.metadata?.sources || [],
+      memorySources: msg.metadata?.memory_sources || [],
       thinking: msg.metadata?.thinking_steps?.length > 0,
       thinkingSteps: msg.metadata?.thinking_steps || []
     }))

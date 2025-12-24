@@ -133,6 +133,7 @@ async def chat_with_model_stream(
         thinking_steps = []  # 收集思考步骤
         web_sources = []
         kb_sources = None
+        memory_sources = []  # 收集长时记忆来源
         
         try:
             # 发送对话 ID
@@ -234,6 +235,8 @@ async def chat_with_model_stream(
                         msg_metadata['sources'] = kb_sources
                     if thinking_steps:
                         msg_metadata['thinking_steps'] = thinking_steps
+                    if memory_sources:
+                        msg_metadata['memory_sources'] = memory_sources
                     
                     assistant_msg = await ChatService.create_message(
                         db=db,
