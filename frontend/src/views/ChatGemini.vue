@@ -273,9 +273,28 @@
               name="list"
               class="space-y-6 pb-36"
             >
+              <!-- 加载更多历史消息提示 -->
+              <div v-if="messagesHasMore || loadingMoreMessages" key="load-more" class="flex justify-center py-4">
+                <button
+                  v-if="!loadingMoreMessages"
+                  @click="loadMoreMessages"
+                  class="flex items-center gap-2 px-4 py-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+                  </svg>
+                  <span>加载更早的消息</span>
+                </button>
+                <div v-else class="flex items-center gap-2 text-sm text-gray-500">
+                  <svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                  </svg>
+                  <span>加载中...</span>
+                </div>
+              </div>
               <div
                 v-for="(message, index) in messages"
-                :key="index"
+                :key="'msg-' + index"
                 class="message-item w-full"
               >
                 <!-- 用户消息 -->
@@ -951,7 +970,13 @@
 import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { getConversations, getConversation, updateConversation, deleteConversation } from '@/api/chat'
+import {
+  getConversations,
+  getConversation,
+  getConversationMessages,
+  updateConversation,
+  deleteConversation
+} from '@/api/chat'
 import { getKnowledgeBases } from '@/api/knowledge'
 import { getProviders, getModels, getModelGroup } from '@/api/llm'
 import { autoExtractMemory, createMemory } from '@/api/memory'
@@ -998,6 +1023,10 @@ const isSearching = ref(false)
 const showWebSearchSettings = ref(false)
 const webSearchDropdownRef = ref(null)
 const copiedMessageIndex = ref(null)
+const messagesTotal = ref(0)  // 消息总数
+const messagesHasMore = ref(false)  // 是否有更多历史消息
+const loadingMoreMessages = ref(false)  // 是否正在加载更多消息
+const messagesContainerRef = ref(null)  // 消息容器引用
 const addingMemoryIndex = ref(null)
 const webSearchConfig = ref({
   timeout: null,
@@ -1123,6 +1152,8 @@ const handleNewChat = () => {
   currentConversationId.value = null
   currentConversationTitle.value = ''
   inputMessage.value = ''
+  messagesTotal.value = 0
+  messagesHasMore.value = false
   // Focus input
   nextTick(() => {
     inputTextarea.value?.focus()
@@ -1162,15 +1193,23 @@ const scrollToBottom = (force = false) => {
   })
 }
 
-// 检测用户是否手动滚动
+// 检测用户是否手动滚动，并在滚动到顶部时加载更多历史消息
 const handleChatScroll = () => {
-  if (!chatContainer.value || !loading.value) {
-    return
-  }
+  if (!chatContainer.value) return
+  
   const { scrollTop, scrollHeight, clientHeight } = chatContainer.value
-  // 如果距离底部超过 100px，认为用户手动滚动了
-  const distanceFromBottom = scrollHeight - scrollTop - clientHeight
-  userHasScrolled.value = distanceFromBottom > 100
+  
+  // 滚动到顶部附近时，加载更多历史消息
+  if (scrollTop < 100 && messagesHasMore.value && !loadingMoreMessages.value && !loading.value) {
+    loadMoreMessages()
+  }
+  
+  // 如果正在生成回复，检测用户是否手动滚动
+  if (loading.value) {
+    // 如果距离底部超过 100px，认为用户手动滚动了
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight
+    userHasScrolled.value = distanceFromBottom > 100
+  }
 }
 
 const handleSend = async () => {
@@ -1610,10 +1649,17 @@ const loadConversation = async (id) => {
   
   try {
     loading.value = true
-    const res = await getConversation(id)
-    currentConversationId.value = res.id
-    currentConversationTitle.value = res.title
-    messages.value = res.messages.map(msg => ({
+    // 先获取对话基本信息
+    const convRes = await getConversation(id)
+    currentConversationId.value = convRes.id
+    currentConversationTitle.value = convRes.title
+    
+    // 分页获取最新的消息（从最新的开始，显示最近20条）
+    const msgRes = await getConversationMessages(id, { limit: 20, offset: 0 })
+    messagesTotal.value = msgRes.total
+    messagesHasMore.value = msgRes.total > 20
+    
+    messages.value = msgRes.messages.map(msg => ({
       role: msg.role,
       // 过滤掉知识库上下文前缀，只显示用户原始问题
       content: msg.role === 'user' ? extractUserQuestion(msg.content) : msg.content,
@@ -1637,6 +1683,64 @@ const loadConversation = async (id) => {
     console.error('Failed to load conversation:', error)
   } finally {
     loading.value = false
+  }
+}
+
+// 加载更多历史消息（向上滚动时触发）
+const loadMoreMessages = async () => {
+  if (!currentConversationId.value || loadingMoreMessages.value || !messagesHasMore.value) return
+  
+  try {
+    loadingMoreMessages.value = true
+    const currentCount = messages.value.length
+    
+    // 获取更早的消息
+    const msgRes = await getConversationMessages(currentConversationId.value, {
+      limit: 20,
+      offset: currentCount
+    })
+    
+    if (msgRes.messages.length > 0) {
+      // 记录当前滚动位置
+      const container = messagesContainerRef.value
+      const scrollHeightBefore = container?.scrollHeight || 0
+      
+      // 将新消息添加到开头
+      const newMessages = msgRes.messages.map(msg => ({
+        role: msg.role,
+        content: msg.role === 'user' ? extractUserQuestion(msg.content) : msg.content,
+        webSources: msg.metadata?.web_sources || [],
+        sources: msg.metadata?.sources || [],
+        memorySources: msg.metadata?.memory_sources || [],
+        thinking: msg.metadata?.thinking_steps?.length > 0,
+        thinkingSteps: msg.metadata?.thinking_steps || []
+      }))
+      
+      messages.value = [...newMessages, ...messages.value]
+      messagesHasMore.value = msgRes.has_more
+      
+      // 保持滚动位置
+      await nextTick()
+      if (container) {
+        const scrollHeightAfter = container.scrollHeight
+        container.scrollTop = scrollHeightAfter - scrollHeightBefore
+      }
+    } else {
+      messagesHasMore.value = false
+    }
+  } catch (error) {
+    console.error('Failed to load more messages:', error)
+  } finally {
+    loadingMoreMessages.value = false
+  }
+}
+
+// 处理消息容器滚动事件
+const handleMessagesScroll = (event) => {
+  const container = event.target
+  // 当滚动到顶部附近时，加载更多历史消息
+  if (container.scrollTop < 100 && messagesHasMore.value && !loadingMoreMessages.value) {
+    loadMoreMessages()
   }
 }
 

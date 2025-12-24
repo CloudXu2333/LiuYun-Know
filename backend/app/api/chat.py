@@ -1,10 +1,11 @@
 """
 对话相关 API - 对话管理（CRUD）
 """
-from typing import List
+from typing import List, Optional
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+from pydantic import BaseModel
 from app.core.database import get_db
 from app.dependencies import get_current_user
 from app.models.user import User
@@ -18,6 +19,13 @@ from app.schemas.chat import (
 from app.services.chat_service import ChatService
 
 router = APIRouter(prefix="/chat", tags=["对话"])
+
+
+class MessageListResponse(BaseModel):
+    """消息列表响应（分页）"""
+    messages: List[MessageResponse]
+    total: int
+    has_more: bool
 
 
 @router.post("/conversations", response_model=ConversationResponse, status_code=status.HTTP_201_CREATED)
@@ -103,6 +111,50 @@ async def get_conversation(
     return ConversationDetail(
         **ConversationResponse.model_validate(conversation).model_dump(),
         messages=[MessageResponse.model_validate(msg) for msg in messages]
+    )
+
+
+@router.get("/conversations/{conversation_id}/messages", response_model=MessageListResponse)
+async def get_conversation_messages(
+    conversation_id: UUID,
+    limit: int = Query(default=20, ge=1, le=100, description="每页消息数量"),
+    offset: int = Query(default=0, ge=0, description="偏移量"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    分页获取对话消息
+    
+    Args:
+        conversation_id: 对话 ID
+        limit: 每页数量（默认20，最大100）
+        offset: 偏移量
+        current_user: 当前用户
+        db: 数据库会话
+    
+    Returns:
+        消息列表（分页）
+    """
+    conversation = await ChatService.get_conversation(db, str(conversation_id), current_user)
+    
+    if not conversation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="对话不存在"
+        )
+    
+    # 获取消息总数
+    total = await ChatService.get_conversation_messages_count(db, conversation_id)
+    
+    # 获取分页消息
+    messages = await ChatService.get_conversation_messages(
+        db, conversation_id, limit=limit, offset=offset
+    )
+    
+    return MessageListResponse(
+        messages=[MessageResponse.model_validate(msg) for msg in messages],
+        total=total,
+        has_more=(offset + len(messages)) < total
     )
 
 

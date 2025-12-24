@@ -96,17 +96,35 @@ class ChatService:
     async def get_conversation_messages(
         db: AsyncSession,
         conversation_id: UUID,
-        limit: int = 50
+        limit: int = None,
+        offset: int = 0
     ) -> List[Message]:
-        """获取对话的消息列表"""
+        """获取对话的消息列表（支持分页）"""
         conversation_id_str = str(conversation_id)
-        result = await db.execute(
+        query = (
             select(Message)
             .where(Message.conversation_id == conversation_id_str)
             .order_by(Message.created_at)
-            .limit(limit)
+            .offset(offset)
         )
+        if limit:
+            query = query.limit(limit)
+        result = await db.execute(query)
         return list(result.scalars().all())
+    
+    @staticmethod
+    async def get_conversation_messages_count(
+        db: AsyncSession,
+        conversation_id: UUID
+    ) -> int:
+        """获取对话的消息总数"""
+        from sqlalchemy import func
+        conversation_id_str = str(conversation_id)
+        result = await db.execute(
+            select(func.count(Message.id))
+            .where(Message.conversation_id == conversation_id_str)
+        )
+        return result.scalar() or 0
     
     @staticmethod
     async def create_message(

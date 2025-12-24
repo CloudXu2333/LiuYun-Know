@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" agent="MCP Server">
+  <diagram name="Page-1" id="page1">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1000" pageHeight="1200">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="用户登录流程" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="200" y="10" width="500" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="start" value="开始登录" style="ellipse;whiteSpace=wrap;html=1;;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="400" y="80" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="input" value="输入用户名和密码" style="shape=parallelogram;whiteSpace=wrap;html=1;;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="400" y="200" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="validate" value="验证用户信息" style="rhombus;whiteSpace=wrap;html=1;;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="400" y="320" width="160" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="success" value="登录成功" style="whiteSpace=wrap;html=1;;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="150" y="440" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="redirect" value="跳转到主页" style="whiteSpace=wrap;html=1;;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="150" y="560" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="failure" value="登录失败" style="whiteSpace=wrap;html=1;;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="650" y="440" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="error_msg" value="显示错误信息" style="whiteSpace=wrap;html=1;;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="650" y="560" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="retry" value="返回登录页面" style="whiteSpace=wrap;html=1;;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="650" y="680" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="end" value="结束" style="ellipse;whiteSpace=wrap;html=1;;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="400" y="800" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_0"  style="html=1;edgeStyle=orthogonalEdgeStyle;strokeColor=#333333;strokeWidth=2;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;labelBackgroundColor=#ffffff;fontSize=11;" edge="1" parent="1" source="start" target="input">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_1"  style="html=1;edgeStyle=orthogonalEdgeStyle;strokeColor=#333333;strokeWidth=2;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;labelBackgroundColor=#ffffff;fontSize=11;" edge="1" parent="1" source="input" target="validate">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_2" value="是" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#333333;strokeWidth=2;endArrow=classic;exitX=0;exitY=0.5;entryX=1;entryY=0.5;jettySize=auto;orthogonalLoop=1;labelBackgroundColor=#ffffff;fontSize=11;" edge="1" parent="1" source="validate" target="success">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_3" value="否" style="html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#333333;strokeWidth=2;endArrow=classic;exitX=1;exitY=0.5;entryX=0;entryY=0.5;jettySize=auto;orthogonalLoop=1;labelBackgroundColor=#ffffff;fontSize=11;" edge="1" parent="1" source="validate" target="failure">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_4"  style="html=1;edgeStyle=orthogonalEdgeStyle;strokeColor=#333333;strokeWidth=2;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;labelBackgroundColor=#ffffff;fontSize=11;" edge="1" parent="1" source="success" target="redirect">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_5"  style="html=1;edgeStyle=orthogonalEdgeStyle;strokeColor=#333333;strokeWidth=2;endArrow=classic;exitX=1;exitY=0.5;entryX=0;entryY=0.5;jettySize=auto;orthogonalLoop=1;labelBackgroundColor=#ffffff;fontSize=11;" edge="1" parent="1" source="redirect" target="end">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_6"  style="html=1;edgeStyle=orthogonalEdgeStyle;strokeColor=#333333;strokeWidth=2;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;labelBackgroundColor=#ffffff;fontSize=11;" edge="1" parent="1" source="failure" target="error_msg">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_7"  style="html=1;edgeStyle=orthogonalEdgeStyle;strokeColor=#333333;strokeWidth=2;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;labelBackgroundColor=#ffffff;fontSize=11;" edge="1" parent="1" source="error_msg" target="retry">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_8"  style="html=1;edgeStyle=orthogonalEdgeStyle;curved=1;dashed=1;strokeColor=#333333;strokeWidth=2;endArrow=classic;exitX=0;exitY=0.5;entryX=0;entryY=0.5;jettySize=auto;orthogonalLoop=1;labelBackgroundColor=#ffffff;fontSize=11;" edge="1" parent="1" source="retry" target="input">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

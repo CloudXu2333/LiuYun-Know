@@ -139,7 +139,7 @@ async def chat_with_model_stream(
             # 发送对话 ID
             yield f"data: {json.dumps({'conversation_id': str(conversation.id), 'type': 'init'})}\n\n"
             
-            # 获取历史消息
+            # 获取历史消息（不限制条数，由 context_manager 根据 token 处理）
             history_messages = await ChatService.get_conversation_messages(db, conversation.id)
             
             # 转换历史消息格式（不再限制数量，由 context_manager 处理）

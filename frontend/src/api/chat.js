@@ -36,6 +36,19 @@ export const getConversationDetail = async (conversationId) => {
 }
 
 /**
+ * 分页获取对话消息
+ * @param {string} conversationId - 对话 ID
+ * @param {Object} params - 分页参数
+ * @param {number} params.limit - 每页数量（默认20）
+ * @param {number} params.offset - 偏移量
+ * @returns {Promise<{messages: Array, total: number, has_more: boolean}>}
+ */
+export const getConversationMessages = async (conversationId, params = {}) => {
+  const response = await axios.get(`/chat/conversations/${conversationId}/messages`, { params })
+  return response.data
+}
+
+/**
  * 更新对话
  */
 export const updateConversation = async (conversationId, data) => {
