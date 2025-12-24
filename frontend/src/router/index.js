@@ -57,6 +57,12 @@ const routes = [
     component: () => import('@/views/DiagramPage.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/admin/users',
+    name: 'AdminUsers',
+    component: () => import('@/views/AdminUsers.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true },
+  },
 ]
 
 const router = createRouter({
@@ -70,10 +76,14 @@ router.beforeEach(async (to, from, next) => {
   
   // 检查是否需要认证
   const requiresAuth = to.matched.some((record) => record.meta.requiresAuth !== false)
+  const requiresAdmin = to.matched.some((record) => record.meta.requiresAdmin === true)
   
   if (requiresAuth && !authStore.isAuthenticated) {
     // 需要认证但未登录，跳转到登录页
     next({ name: 'Login', query: { redirect: to.fullPath } })
+  } else if (requiresAdmin && !authStore.user?.is_superuser) {
+    // 需要管理员权限但不是管理员，跳转到对话页面
+    next({ name: 'Chat' })
   } else if (!requiresAuth && authStore.isAuthenticated && (to.name === 'Login' || to.name === 'Register')) {
     // 已登录用户访问登录/注册页，跳转到对话页面
     next({ name: 'Chat' })

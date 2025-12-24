@@ -157,19 +157,6 @@
             登录中...
           </span>
         </button>
-
-        <!-- 注册链接 -->
-        <div class="text-center pt-2">
-          <p class="text-gray-500 text-sm">
-            还没有账号？
-            <router-link
-              to="/register"
-              class="text-blue-600 hover:text-blue-700 font-medium transition-colors hover:underline decoration-2 underline-offset-4"
-            >
-              立即注册
-            </router-link>
-          </p>
-        </div>
       </form>
     </div>
   </div>
