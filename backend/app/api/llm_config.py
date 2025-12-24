@@ -186,7 +186,9 @@ async def chat_with_model_stream(
                 system_prompt="你是一个有帮助的AI助手。请用中文回答问题。",
                 max_context_tokens=request.max_context_tokens,
                 db=db,  # 传入数据库会话
-                user_id=current_user.id  # 传入用户 ID
+                user_id=current_user.id,  # 传入用户 ID
+                memory_top_k=current_user.memory_top_k,  # 用户配置的普通记忆检索数量
+                core_memory_threshold=current_user.core_memory_threshold  # 用户配置的核心记忆阈值
             ):
                 event_type = event.get("type")
                 

@@ -138,12 +138,12 @@ def format_web_search_context(results: List[Dict]) -> str:
     ]
     
     for i, r in enumerate(results, 1):
-        lines.append(f"[来源{i}] {r.get('title', 'No title')}")
+        lines.append(f"[网络{i}] {r.get('title', 'No title')}")
         lines.append(f"URL: {r.get('url', '')}")
         lines.append(f"内容: {r.get('snippet', '')}")
         lines.append("")
     
-    lines.append("请在回答中适当引用来源，使用 [来源X] 格式标注。")
+    lines.append("【重要】如果回答中引用了网络搜索的信息，请使用 [网络X] 格式标注（X为对应编号）。")
     return "\n".join(lines)
 
 
@@ -158,24 +158,23 @@ def format_kb_context(kb_name: str, chunks: List[Dict], graph_data: Dict) -> str
     for idx, chunk in enumerate(chunks[:10], 1):
         content = chunk.get('content', '')
         if content and len(content) > 10:
-            source_parts.append(f"[来源{idx}]\n{content[:600]}")
+            source_parts.append(f"[知识库{idx}]\n{content[:600]}")
     
     # 如果没有分片，使用图谱实体描述
     if not source_parts and graph_data.get('entities'):
         for idx, entity in enumerate(graph_data['entities'][:5], 1):
             desc = entity.get('description', '')
             if desc:
-                source_parts.append(f"[来源{idx}]\n{entity.get('name', '')}: {desc[:400]}")
+                source_parts.append(f"[知识库{idx}]\n{entity.get('name', '')}: {desc[:400]}")
     
     if not source_parts:
         return ""
     
     sources_text = "\n\n".join(source_parts)
     
-    return f"""以下是从知识库「{kb_name}」中检索到的相关信息，每条信息都有编号标记：
+    return f"""【知识库检索结果】
+以下是从知识库「{kb_name}」中检索到的相关信息：
 
 {sources_text}
 
-【重要】请基于以上知识库内容回答用户问题。在回答中引用知识库内容时，请在相关句子末尾添加引用标记，格式为 [1]、[2] 等，对应上面的来源编号。
-
-如果知识库内容不足以回答问题，可以结合你的知识进行补充，但要明确说明哪些是来自知识库的信息（带引用标记），哪些是你的补充。"""
+【重要】如果回答中引用了知识库的信息，请使用 [知识库X] 格式标注（X为对应编号）。如果知识库内容不足以回答问题，可以结合你的知识进行补充，但要明确区分来源。"""

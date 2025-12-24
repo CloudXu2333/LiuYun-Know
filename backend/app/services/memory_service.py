@@ -1,15 +1,115 @@
 """
 记忆服务 - 长期记忆的增删查改（异步版本）
+支持核心记忆（高优先级）必定加载 + 普通记忆向量检索
 """
 from typing import List, Optional, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, and_
 from app.models.memory import LongTermMemory
 from app.schemas.memory import LongTermMemoryCreate, LongTermMemoryUpdate
 
 
 class MemoryService:
     """记忆服务"""
+    
+    async def get_core_memories(
+        self,
+        db: AsyncSession,
+        user_id: str,
+        threshold: int = 80
+    ) -> List[LongTermMemory]:
+        """
+        获取核心记忆（优先级 >= threshold 的记忆，必定加载）
+        
+        Args:
+            db: 数据库会话
+            user_id: 用户 ID
+            threshold: 核心记忆优先级阈值，默认 80
+            
+        Returns:
+            核心记忆列表
+        """
+        query = select(LongTermMemory).where(
+            and_(
+                LongTermMemory.user_id == user_id,
+                LongTermMemory.is_active == True,
+                LongTermMemory.priority >= threshold
+            )
+        ).order_by(
+            desc(LongTermMemory.priority),
+            desc(LongTermMemory.created_at)
+        )
+        
+        result = await db.execute(query)
+        return list(result.scalars().all())
+    
+    async def get_normal_memories(
+        self,
+        db: AsyncSession,
+        user_id: str,
+        threshold: int = 80
+    ) -> List[LongTermMemory]:
+        """
+        获取普通记忆（优先级 < threshold 的记忆，用于向量检索）
+        
+        Args:
+            db: 数据库会话
+            user_id: 用户 ID
+            threshold: 核心记忆优先级阈值，默认 80
+            
+        Returns:
+            普通记忆列表
+        """
+        query = select(LongTermMemory).where(
+            and_(
+                LongTermMemory.user_id == user_id,
+                LongTermMemory.is_active == True,
+                LongTermMemory.priority < threshold
+            )
+        ).order_by(
+            desc(LongTermMemory.priority),
+            desc(LongTermMemory.created_at)
+        )
+        
+        result = await db.execute(query)
+        return list(result.scalars().all())
+    
+    async def get_memories_for_context(
+        self,
+        db: AsyncSession,
+        user_id: str,
+        query_text: str = None,
+        top_k: int = 5,
+        threshold: int = 80
+    ) -> Tuple[List[LongTermMemory], List[LongTermMemory]]:
+        """
+        获取用于上下文的记忆：核心记忆 + 相关普通记忆
+        
+        Args:
+            db: 数据库会话
+            user_id: 用户 ID
+            query_text: 用户查询文本（用于向量检索）
+            top_k: 普通记忆检索数量
+            threshold: 核心记忆优先级阈值
+            
+        Returns:
+            (核心记忆列表, 普通记忆列表)
+        """
+        # 1. 获取核心记忆（必定加载）
+        core_memories = await self.get_core_memories(db, user_id, threshold)
+        
+        # 2. 获取普通记忆
+        normal_memories = await self.get_normal_memories(db, user_id, threshold)
+        
+        # 3. 如果有查询文本，进行向量相似度检索；否则按优先级取 top_k
+        if query_text and normal_memories:
+            # TODO: 实现向量检索
+            # 目前先按优先级排序取 top_k
+            selected_normal = normal_memories[:top_k]
+        else:
+            selected_normal = normal_memories[:top_k]
+        
+        return core_memories, selected_normal
     
     async def get_user_memories(
         self,
@@ -169,34 +269,89 @@ class MemoryService:
         await db.refresh(memory)
         return memory
     
-    def format_memories_for_context(self, memories: List[LongTermMemory]) -> str:
+    def format_memories_for_context(
+        self, 
+        memories: List[LongTermMemory] = None,
+        core_memories: List[LongTermMemory] = None,
+        normal_memories: List[LongTermMemory] = None
+    ) -> str:
         """
         将记忆格式化为上下文字符串
         
         Args:
-            memories: 记忆列表
+            memories: 记忆列表（兼容旧接口）
+            core_memories: 核心记忆列表
+            normal_memories: 普通记忆列表
             
         Returns:
             格式化的记忆字符串
         """
-        if not memories:
+        # 兼容旧接口
+        if memories is not None and core_memories is None and normal_memories is None:
+            if not memories:
+                return ""
+            
+            lines = ["【用户长期记忆】"]
+            
+            for i, memory in enumerate(memories, 1):
+                category_label = {
+                    "general": "通用",
+                    "preference": "偏好",
+                    "fact": "事实",
+                    "instruction": "指令"
+                }.get(memory.category, memory.category)
+                
+                lines.append(f"[记忆{i}] [{category_label}] {memory.title}")
+                lines.append(f"内容: {memory.content}")
+                lines.append("")
+            
+            lines.append("【重要】如果回答中使用了长期记忆的信息，请使用 [记忆X] 格式标注（X为对应编号）。")
+            
+            return "\n".join(lines)
+        
+        # 新接口：区分核心记忆和普通记忆
+        core_memories = core_memories or []
+        normal_memories = normal_memories or []
+        
+        if not core_memories and not normal_memories:
             return ""
         
         lines = ["【用户长期记忆】"]
+        memory_index = 1
         
-        for i, memory in enumerate(memories, 1):
-            category_label = {
-                "general": "通用",
-                "preference": "偏好",
-                "fact": "事实",
-                "instruction": "指令"
-            }.get(memory.category, memory.category)
-            
-            lines.append(f"[记忆{i}] [{category_label}] {memory.title}")
-            lines.append(f"内容: {memory.content}")
-            lines.append("")
+        # 核心记忆（必定加载）
+        if core_memories:
+            lines.append("\n--- 核心记忆（重要信息，始终生效）---")
+            for memory in core_memories:
+                category_label = {
+                    "general": "通用",
+                    "preference": "偏好",
+                    "fact": "事实",
+                    "instruction": "指令"
+                }.get(memory.category, memory.category)
+                
+                lines.append(f"[记忆{memory_index}] [{category_label}] {memory.title}")
+                lines.append(f"内容: {memory.content}")
+                lines.append("")
+                memory_index += 1
         
-        lines.append("如果回答中使用了上述长期记忆的信息，请在相关内容后使用 [记忆X] 格式标注。")
+        # 普通记忆（相关检索）
+        if normal_memories:
+            lines.append("\n--- 相关记忆（根据当前对话检索）---")
+            for memory in normal_memories:
+                category_label = {
+                    "general": "通用",
+                    "preference": "偏好",
+                    "fact": "事实",
+                    "instruction": "指令"
+                }.get(memory.category, memory.category)
+                
+                lines.append(f"[记忆{memory_index}] [{category_label}] {memory.title}")
+                lines.append(f"内容: {memory.content}")
+                lines.append("")
+                memory_index += 1
+        
+        lines.append("【重要】如果回答中使用了长期记忆的信息，请使用 [记忆X] 格式标注（X为对应编号）。")
         
         return "\n".join(lines)
 

@@ -42,12 +42,31 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
             </svg>
           </div>
-          <div>
+          <div class="flex-1">
             <h3 class="font-medium text-purple-900">什么是长期记忆？</h3>
             <p class="text-sm text-purple-700 mt-1">
               长期记忆是跨对话持久化的信息，每次对话时 AI 都会参考这些记忆。
               你可以添加个人偏好、重要事实、特殊指令等，让 AI 更好地理解你。
             </p>
+            <div class="mt-3 p-3 bg-white/60 rounded-lg">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-sm font-medium text-purple-800">记忆加载策略</span>
+                <button 
+                  @click="showSettingsDialog = true"
+                  class="text-xs text-purple-600 hover:text-purple-800 flex items-center space-x-1"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                  </svg>
+                  <span>设置</span>
+                </button>
+              </div>
+              <div class="text-xs text-purple-600 space-y-1">
+                <p>• <span class="font-medium">核心记忆</span>（优先级 ≥ {{ memorySettings.core_memory_threshold }}）：每次对话必定加载</p>
+                <p>• <span class="font-medium">普通记忆</span>（优先级 &lt; {{ memorySettings.core_memory_threshold }}）：检索最相关的 {{ memorySettings.memory_top_k }} 条</p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -134,6 +153,12 @@
                   :class="getCategoryClass(memory.category)"
                 >
                   {{ getCategoryLabel(memory.category) }}
+                </span>
+                <span 
+                  v-if="memory.priority >= memorySettings.core_memory_threshold" 
+                  class="px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-700 font-medium"
+                >
+                  ⭐ 核心记忆
                 </span>
                 <span v-if="memory.priority > 0" class="text-xs text-orange-600">
                   优先级: {{ memory.priority }}
@@ -284,11 +309,108 @@
         </div>
       </div>
     </div>
+
+    <!-- 记忆设置对话框 -->
+    <div v-if="showSettingsDialog" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-2xl w-full max-w-md shadow-xl">
+        <div class="p-6 border-b border-gray-200">
+          <h2 class="text-lg font-semibold text-gray-900">记忆加载设置</h2>
+          <p class="text-sm text-gray-500 mt-1">自定义记忆的加载策略</p>
+        </div>
+        <div class="p-6 space-y-6">
+          <!-- 核心记忆阈值 -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              核心记忆优先级阈值
+              <span class="text-gray-400 font-normal ml-1">(0-100)</span>
+            </label>
+            <div class="flex items-center space-x-4">
+              <input
+                v-model.number="settingsForm.core_memory_threshold"
+                type="range"
+                min="0"
+                max="100"
+                step="5"
+                class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
+              >
+              <input
+                v-model.number="settingsForm.core_memory_threshold"
+                type="number"
+                min="0"
+                max="100"
+                class="w-20 px-3 py-2 border border-gray-300 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-purple-500"
+              >
+            </div>
+            <p class="text-xs text-gray-500 mt-2">
+              优先级 ≥ {{ settingsForm.core_memory_threshold }} 的记忆将作为核心记忆，每次对话必定加载
+            </p>
+          </div>
+
+          <!-- 普通记忆检索数量 -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              普通记忆检索数量
+              <span class="text-gray-400 font-normal ml-1">(1-20)</span>
+            </label>
+            <div class="flex items-center space-x-4">
+              <input
+                v-model.number="settingsForm.memory_top_k"
+                type="range"
+                min="1"
+                max="20"
+                step="1"
+                class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
+              >
+              <input
+                v-model.number="settingsForm.memory_top_k"
+                type="number"
+                min="1"
+                max="20"
+                class="w-20 px-3 py-2 border border-gray-300 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-purple-500"
+              >
+            </div>
+            <p class="text-xs text-gray-500 mt-2">
+              每次对话时，从普通记忆中检索最相关的 {{ settingsForm.memory_top_k }} 条
+            </p>
+          </div>
+
+          <!-- 预览 -->
+          <div class="bg-gray-50 rounded-lg p-4">
+            <h4 class="text-sm font-medium text-gray-700 mb-2">当前记忆统计</h4>
+            <div class="grid grid-cols-2 gap-4 text-sm">
+              <div class="bg-amber-50 rounded-lg p-3 text-center">
+                <div class="text-2xl font-bold text-amber-600">{{ coreMemoryCount }}</div>
+                <div class="text-xs text-amber-700">核心记忆</div>
+              </div>
+              <div class="bg-blue-50 rounded-lg p-3 text-center">
+                <div class="text-2xl font-bold text-blue-600">{{ normalMemoryCount }}</div>
+                <div class="text-xs text-blue-700">普通记忆</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="p-6 border-t border-gray-200 flex justify-end space-x-3">
+          <button
+            @click="showSettingsDialog = false"
+            class="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            取消
+          </button>
+          <button
+            @click="saveSettings"
+            :disabled="savingSettings"
+            class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {{ savingSettings ? '保存中...' : '保存设置' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
@@ -300,6 +422,7 @@ import {
   toggleMemory,
   autoExtractMemory
 } from '@/api/memory'
+import { getMemorySettings, updateMemorySettings } from '@/api/user'
 
 const router = useRouter()
 
@@ -308,6 +431,7 @@ const loading = ref(false)
 const saving = ref(false)
 const deleting = ref(false)
 const extracting = ref(false)
+const savingSettings = ref(false)
 const memories = ref([])
 const autoExtractInput = ref('')
 const categories = ref([
@@ -316,6 +440,25 @@ const categories = ref([
   { value: 'fact', label: '事实' },
   { value: 'instruction', label: '指令' }
 ])
+
+// 记忆设置
+const memorySettings = ref({
+  memory_top_k: 5,
+  core_memory_threshold: 80
+})
+const settingsForm = ref({
+  memory_top_k: 5,
+  core_memory_threshold: 80
+})
+const showSettingsDialog = ref(false)
+
+// 计算核心记忆和普通记忆数量
+const coreMemoryCount = computed(() => {
+  return memories.value.filter(m => m.is_active && m.priority >= settingsForm.value.core_memory_threshold).length
+})
+const normalMemoryCount = computed(() => {
+  return memories.value.filter(m => m.is_active && m.priority < settingsForm.value.core_memory_threshold).length
+})
 
 // 筛选
 const filterCategory = ref('')
@@ -519,13 +662,54 @@ const formatDate = (dateStr) => {
   })
 }
 
+// 加载记忆设置
+const loadMemorySettings = async () => {
+  try {
+    const res = await getMemorySettings()
+    memorySettings.value = {
+      memory_top_k: res.memory_top_k || 5,
+      core_memory_threshold: res.core_memory_threshold || 80
+    }
+    settingsForm.value = { ...memorySettings.value }
+  } catch (error) {
+    console.error('加载记忆设置失败:', error)
+  }
+}
+
+// 保存记忆设置
+const saveSettings = async () => {
+  savingSettings.value = true
+  try {
+    const res = await updateMemorySettings(settingsForm.value)
+    memorySettings.value = {
+      memory_top_k: res.memory_top_k,
+      core_memory_threshold: res.core_memory_threshold
+    }
+    showSettingsDialog.value = false
+    ElMessage.success('设置已保存')
+  } catch (error) {
+    console.error('保存设置失败:', error)
+    ElMessage.error('保存设置失败')
+  } finally {
+    savingSettings.value = false
+  }
+}
+
 // 监听筛选变化
 watch([filterCategory, showInactiveOnly], () => {
   loadMemories()
 })
 
+// 打开设置对话框时，同步表单数据
+watch(showSettingsDialog, (val) => {
+  if (val) {
+    settingsForm.value = { ...memorySettings.value }
+  }
+})
+
 onMounted(() => {
   loadCategories()
   loadMemories()
+  loadMemorySettings()
 })
 </script>

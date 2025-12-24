@@ -264,6 +264,76 @@ class ConversationAgent:
                 "thinking_steps": thinking_steps
             }
     
+    async def _extract_search_query(
+        self,
+        user_query: str,
+        history_messages: List[Dict[str, str]] = None,
+        model: str = "deepseek-chat",
+        api_key: str = None,
+        base_url: str = None
+    ) -> str:
+        """
+        使用 AI 分析用户问题和历史对话，提取最佳搜索关键词
+        
+        Args:
+            user_query: 用户当前问题
+            history_messages: 历史对话消息
+            model: 模型名称
+            api_key: API Key
+            base_url: API Base URL
+            
+        Returns:
+            优化后的搜索关键词
+        """
+        # 构建历史对话上下文
+        context = ""
+        if history_messages and len(history_messages) > 0:
+            # 只取最近的几轮对话
+            recent_messages = history_messages[-6:]  # 最近3轮对话
+            context_parts = []
+            for msg in recent_messages:
+                role = "用户" if msg.get("role") == "user" else "AI"
+                content = msg.get("content", "")[:200]  # 截断过长内容
+                context_parts.append(f"{role}: {content}")
+            context = "\n".join(context_parts)
+        
+        # 构建提示词
+        prompt = f"""请根据用户的问题和对话历史，提取最适合用于网络搜索的关键词。
+
+要求：
+1. 关键词应该简洁、精准，适合搜索引擎
+2. 如果问题中有指代词（如"它"、"这个"），请根据上下文替换为具体内容
+3. 只返回搜索关键词，不要其他解释
+4. 关键词长度控制在50字以内
+
+{"对话历史：" + chr(10) + context + chr(10) if context else ""}
+用户当前问题：{user_query}
+
+搜索关键词："""
+
+        try:
+            response = await llm_manager.chat_completion(
+                messages=[{"role": "user", "content": prompt}],
+                model=model,
+                api_key=api_key,
+                base_url=base_url,
+                max_tokens=100,
+                temperature=0.3
+            )
+            
+            search_query = response.choices[0].message.content.strip()
+            # 清理可能的引号和多余空格
+            search_query = search_query.strip('"\'').strip()
+            
+            # 如果提取失败或结果太长，使用原始问题
+            if not search_query or len(search_query) > 100:
+                return user_query
+            
+            return search_query
+        except Exception as e:
+            print(f"⚠️ 提取搜索关键词失败: {e}")
+            return user_query
+    
     async def run(
         self,
         user_query: str,
@@ -366,7 +436,9 @@ class ConversationAgent:
         system_prompt: str = None,
         max_context_tokens: int = 16000,
         db = None,  # 数据库会话（用于获取长期记忆）
-        user_id: str = None  # 用户 ID（用于获取长期记忆）
+        user_id: str = None,  # 用户 ID（用于获取长期记忆）
+        memory_top_k: int = 5,  # 普通记忆检索数量
+        core_memory_threshold: int = 80  # 核心记忆优先级阈值
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """
         流式运行 Agent
@@ -375,6 +447,8 @@ class ConversationAgent:
             max_context_tokens: 最大上下文 token 数，超过时自动压缩旧消息
             db: 数据库会话（用于获取长期记忆）
             user_id: 用户 ID（用于获取长期记忆）
+            memory_top_k: 普通记忆检索数量（用户可配置）
+            core_memory_threshold: 核心记忆优先级阈值（用户可配置）
         
         Yields:
             事件字典，包含 type 和相关数据
@@ -410,15 +484,26 @@ class ConversationAgent:
         # Step 2: 联网搜索（如果启用）
         if enable_web_search:
             yield {"type": "search_start"}
-            thinking_steps.append("正在联网搜索...")
-            yield {"type": "thinking_step", "step": "正在联网搜索..."}
+            
+            # 使用 AI 分析历史对话，提取搜索关键词
+            search_query = await self._extract_search_query(
+                user_query=user_query,
+                history_messages=history_messages,
+                model=model,
+                api_key=api_key,
+                base_url=base_url
+            )
+            
+            step = f"正在搜索: {search_query}"
+            thinking_steps.append(step)
+            yield {"type": "thinking_step", "step": step}
             
             try:
                 from app.services.web_search_service import web_search_service
                 
                 if web_search_service.enabled:
                     response = await web_search_service.search(
-                        query=user_query,
+                        query=search_query,
                         max_results=5,
                         use_tavily=True,
                         use_firecrawl=True
@@ -554,7 +639,9 @@ class ConversationAgent:
             api_key=api_key,
             base_url=base_url,
             db=db,
-            user_id=user_id
+            user_id=user_id,
+            memory_top_k=memory_top_k,
+            core_memory_threshold=core_memory_threshold
         )
         
         llm_messages = context_result["messages"]
@@ -572,7 +659,9 @@ class ConversationAgent:
         # 如果包含长期记忆，添加思考步骤并发送记忆详情
         if context_result.get("long_term_memory_included"):
             memories = context_result.get("long_term_memories", [])
-            step = f"📚 已加载用户长期记忆（{len(memories)}条）"
+            core_count = context_result.get("core_memory_count", 0)
+            normal_count = context_result.get("normal_memory_count", 0)
+            step = f"📚 已加载用户长期记忆（核心记忆 {core_count} 条 + 相关记忆 {normal_count} 条）"
             thinking_steps.append(step)
             yield {"type": "thinking_step", "step": step}
             # 发送长时记忆来源

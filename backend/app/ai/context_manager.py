@@ -100,34 +100,63 @@ class ContextManager:
                 "content": f"[历史对话摘要]\n用户之前询问了相关问题，AI 进行了回答。"
             }
     
-    async def get_long_term_memories(self, db: AsyncSession, user_id: str) -> tuple:
+    async def get_long_term_memories(
+        self, 
+        db: AsyncSession, 
+        user_id: str,
+        query_text: str = None,
+        top_k: int = 5,
+        threshold: int = 80
+    ) -> tuple:
         """
         获取用户的长期记忆并格式化
+        
+        新逻辑：
+        1. 核心记忆（priority >= threshold）→ 必定加载
+        2. 普通记忆（priority < threshold）→ 向量检索 top_k 条相关的
         
         Args:
             db: 数据库会话
             user_id: 用户 ID
+            query_text: 用户查询文本（用于向量检索普通记忆）
+            top_k: 普通记忆检索数量
+            threshold: 核心记忆优先级阈值
             
         Returns:
-            (格式化的长期记忆字符串, 记忆列表)
+            (格式化的长期记忆字符串, 记忆列表, 核心记忆数量, 普通记忆数量)
         """
         from app.services.memory_service import memory_service
         
-        memories = await memory_service.get_active_memories(db, user_id)
-        formatted = memory_service.format_memories_for_context(memories)
+        # 获取核心记忆和普通记忆
+        core_memories, normal_memories = await memory_service.get_memories_for_context(
+            db=db,
+            user_id=user_id,
+            query_text=query_text,
+            top_k=top_k,
+            threshold=threshold
+        )
         
-        # 返回记忆详情用于前端显示（完整内容）
+        # 格式化记忆
+        formatted = memory_service.format_memories_for_context(
+            core_memories=core_memories,
+            normal_memories=normal_memories
+        )
+        
+        # 合并记忆列表用于前端显示
+        all_memories = core_memories + normal_memories
         memory_list = [
             {
                 "id": str(m.id),
                 "title": m.title,
                 "category": m.category,
-                "content": m.content
+                "content": m.content,
+                "priority": m.priority,
+                "is_core": m.priority >= threshold
             }
-            for m in memories
+            for m in all_memories
         ]
         
-        return formatted, memory_list
+        return formatted, memory_list, len(core_memories), len(normal_memories)
     
     async def build_context(
         self,
@@ -139,7 +168,9 @@ class ContextManager:
         api_key: str = None,
         base_url: str = None,
         db: AsyncSession = None,
-        user_id: str = None
+        user_id: str = None,
+        memory_top_k: int = 5,
+        core_memory_threshold: int = 80
     ) -> Dict[str, Any]:
         """
         构建上下文，整合长期记忆和短期记忆
@@ -154,6 +185,8 @@ class ContextManager:
             base_url: API Base URL
             db: 数据库会话（用于获取长期记忆）
             user_id: 用户 ID（用于获取长期记忆）
+            memory_top_k: 普通记忆检索数量（用户可配置）
+            core_memory_threshold: 核心记忆优先级阈值（用户可配置）
             
         Returns:
             {
@@ -162,18 +195,28 @@ class ContextManager:
                 "compressed": bool,
                 "original_count": int,
                 "final_count": int,
-                "long_term_memory_included": bool
+                "long_term_memory_included": bool,
+                "core_memory_count": int,
+                "normal_memory_count": int
             }
         """
         max_tokens = max_tokens or self.max_context_tokens
         
-        # 1. 获取长期记忆
+        # 1. 获取长期记忆（核心记忆 + 普通记忆）
         long_term_memory = ""
         long_term_memory_included = False
         long_term_memory_list = []
+        core_memory_count = 0
+        normal_memory_count = 0
         
         if db and user_id:
-            long_term_memory, long_term_memory_list = await self.get_long_term_memories(db, user_id)
+            long_term_memory, long_term_memory_list, core_memory_count, normal_memory_count = await self.get_long_term_memories(
+                db=db,
+                user_id=user_id,
+                query_text=current_query,
+                top_k=memory_top_k,
+                threshold=core_memory_threshold
+            )
             if long_term_memory:
                 long_term_memory_included = True
         
@@ -201,7 +244,9 @@ class ContextManager:
                 "original_count": len(history_messages),
                 "final_count": 0,
                 "long_term_memory_included": long_term_memory_included,
-                "long_term_memories": long_term_memory_list
+                "long_term_memories": long_term_memory_list,
+                "core_memory_count": core_memory_count,
+                "normal_memory_count": normal_memory_count
             }
         
         # 5. 处理短期记忆（从最新的消息开始保留）
@@ -250,7 +295,9 @@ class ContextManager:
             "original_count": len(history_messages),
             "final_count": len(final_messages),
             "long_term_memory_included": long_term_memory_included,
-            "long_term_memories": long_term_memory_list
+            "long_term_memories": long_term_memory_list,
+            "core_memory_count": core_memory_count,
+            "normal_memory_count": normal_memory_count
         }
 
 

@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from app.core.database import get_db
 from app.dependencies import get_current_user, get_current_superuser
-from app.schemas.user import User as UserSchema, UserUpdate, PasswordChange, AdminUserCreate, AdminUserUpdate, UserListResponse
+from app.schemas.user import User as UserSchema, UserUpdate, PasswordChange, AdminUserCreate, AdminUserUpdate, UserListResponse, MemorySettingsUpdate, MemorySettingsResponse
 from app.services.user_service import UserService
 from app.core.security import verify_password, get_password_hash
 from app.models.user import User
@@ -103,6 +103,58 @@ async def change_password(
     await UserService.update_password(db, current_user, password_data.new_password)
     
     return {"message": "密码修改成功"}
+
+
+# ============ 记忆设置 API ============
+
+@router.get("/me/memory-settings", response_model=MemorySettingsResponse)
+async def get_memory_settings(current_user: User = Depends(get_current_user)):
+    """
+    获取用户的记忆设置
+    
+    Returns:
+        记忆设置（memory_top_k, core_memory_threshold）
+    """
+    return MemorySettingsResponse(
+        memory_top_k=current_user.memory_top_k,
+        core_memory_threshold=current_user.core_memory_threshold
+    )
+
+
+@router.put("/me/memory-settings", response_model=MemorySettingsResponse)
+async def update_memory_settings(
+    settings: MemorySettingsUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    更新用户的记忆设置
+    
+    Args:
+        settings: 记忆设置
+            - memory_top_k: 普通记忆检索数量 (1-20)，默认5
+            - core_memory_threshold: 核心记忆优先级阈值 (0-100)，默认80
+    
+    Returns:
+        更新后的记忆设置
+    
+    说明:
+        - 核心记忆（priority >= threshold）：每次对话必定加载
+        - 普通记忆（priority < threshold）：根据对话内容检索 top_k 条相关记忆
+    """
+    if settings.memory_top_k is not None:
+        current_user.memory_top_k = settings.memory_top_k
+    
+    if settings.core_memory_threshold is not None:
+        current_user.core_memory_threshold = settings.core_memory_threshold
+    
+    await db.commit()
+    await db.refresh(current_user)
+    
+    return MemorySettingsResponse(
+        memory_top_k=current_user.memory_top_k,
+        core_memory_threshold=current_user.core_memory_threshold
+    )
 
 
 

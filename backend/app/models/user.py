@@ -3,7 +3,7 @@
 """
 import uuid
 from datetime import datetime
-from sqlalchemy import Boolean, Column, String, DateTime
+from sqlalchemy import Boolean, Column, String, DateTime, Integer
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
@@ -31,6 +31,10 @@ class User(Base):
         onupdate=datetime.utcnow,
         nullable=False
     )
+    
+    # 记忆设置
+    memory_top_k = Column(Integer, default=5, nullable=False)  # 普通记忆向量检索数量，默认5条
+    core_memory_threshold = Column(Integer, default=80, nullable=False)  # 核心记忆优先级阈值，默认80
     
     # 关系
     knowledge_bases = relationship("KnowledgeBase", back_populates="owner")

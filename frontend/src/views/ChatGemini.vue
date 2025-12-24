@@ -379,51 +379,27 @@
                         </div>
                       </transition>
                     </div>
-                    <!-- 联网搜索来源展示 -->
-                    <!-- 联网搜索来源展示 - 紧凑卡片式 -->
-                    <div v-if="message.webSources && message.webSources.length > 0" class="mb-4">
-                      <div class="flex items-center gap-2 mb-2">
-                        <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path>
-                        </svg>
-                        <span class="text-xs font-medium text-gray-600">基于 {{ message.webSources.length }} 个网络来源</span>
-                      </div>
-                      <!-- 来源卡片网格 -->
-                      <div class="flex flex-wrap gap-2">
+                    <!-- 联网搜索来源展示 - 紧凑标签形式 -->
+                    <div v-if="message.webSources && message.webSources.length > 0" class="mb-3">
+                      <div class="flex flex-wrap items-center gap-1.5">
+                        <span class="text-xs text-gray-500">
+                          <svg class="w-3.5 h-3.5 inline mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path>
+                          </svg>
+                          网络来源:
+                        </span>
+                        <!-- 网络来源标签 - 点击打开链接 -->
                         <a
-                          v-for="(source, sIdx) in message.webSources.slice(0, expandedWebSources.includes(index) ? undefined : 3)"
+                          v-for="(source, sIdx) in message.webSources"
                           :key="sIdx"
                           :href="source.url"
                           target="_blank"
                           rel="noopener noreferrer"
-                          class="group flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200 text-sm hover:border-green-400 hover:shadow-sm transition-all max-w-xs"
+                          :title="source.title + '\n' + source.url"
+                          class="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"
                         >
-                          <span class="flex-shrink-0 w-5 h-5 rounded bg-green-500 text-white text-xs flex items-center justify-center font-medium">{{ sIdx + 1 }}</span>
-                          <span class="truncate text-gray-700 group-hover:text-green-700 transition-colors">{{ source.title || '来源 ' + (sIdx + 1) }}</span>
-                          <svg class="w-3.5 h-3.5 text-gray-400 group-hover:text-green-500 flex-shrink-0 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
-                          </svg>
+                          [网络{{ sIdx + 1 }}]
                         </a>
-                        <!-- 展开/收起按钮 -->
-                        <button
-                          v-if="message.webSources.length > 3"
-                          @click="toggleWebSources(index)"
-                          class="flex items-center gap-1 px-3 py-2 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                        >
-                          <span>{{ expandedWebSources.includes(index) ? '收起' : `+${message.webSources.length - 3} 更多` }}</span>
-                          <svg class="w-3 h-3 transition-transform" :class="expandedWebSources.includes(index) ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                    <!-- 搜索中状态 -->
-                    <div v-if="loading && index === messages.length - 1 && isSearching" class="mb-3">
-                      <div class="flex items-center gap-2 px-3 py-1.5 text-xs bg-green-100 text-green-700 rounded-lg">
-                        <svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                        </svg>
-                        <span>正在联网搜索...</span>
                       </div>
                     </div>
                     <!-- 长时记忆来源展示 -->
@@ -1015,7 +991,6 @@ const expandedSources = ref([])
 const expandedSourceItems = ref({})  // 存储每个消息中展开的来源项 { messageIndex: [sourceIndex1, sourceIndex2] }
 const expandedGraphData = ref([])  // 存储展开图谱数据的消息索引
 const expandedThinking = ref([])
-const expandedWebSources = ref([])
 const currentThinking = ref('')
 const currentThinkingSteps = ref([])
 const enableWebSearch = ref(false)
@@ -1750,19 +1725,7 @@ const addToMemory = async (content) => {
     // 调用AI自动提取
     const extracted = await autoExtractMemory(content)
     
-    // 弹出确认对话框
-    await ElMessageBox.confirm(
-      `标题: ${extracted.title}\n分类: ${getCategoryLabel(extracted.category)}\n优先级: ${extracted.priority}\n\n内容: ${extracted.content.substring(0, 200)}${extracted.content.length > 200 ? '...' : ''}`,
-      '确认添加到长时记忆',
-      {
-        confirmButtonText: '添加',
-        cancelButtonText: '取消',
-        type: 'info',
-        customClass: 'memory-confirm-dialog'
-      }
-    )
-    
-    // 用户确认后创建记忆
+    // 直接创建记忆，不需要用户确认
     await createMemory({
       title: extracted.title,
       content: extracted.content,
@@ -1771,12 +1734,10 @@ const addToMemory = async (content) => {
       is_active: true
     })
     
-    ElMessage.success('已添加到长时记忆')
+    ElMessage.success(`已添加到长时记忆: ${extracted.title}`)
   } catch (err) {
-    if (err !== 'cancel') {
-      console.error('添加记忆失败:', err)
-      ElMessage.error('添加失败，请重试')
-    }
+    console.error('添加记忆失败:', err)
+    ElMessage.error('添加失败，请重试')
   } finally {
     addingMemoryIndex.value = null
   }
@@ -1889,16 +1850,6 @@ const formatEntityDescription = (description) => {
     return firstDesc.slice(0, 150) + '...'
   }
   return firstDesc
-}
-
-// 切换联网搜索来源展开/收起
-const toggleWebSources = (index) => {
-  const idx = expandedWebSources.value.indexOf(index)
-  if (idx > -1) {
-    expandedWebSources.value.splice(idx, 1)
-  } else {
-    expandedWebSources.value.push(index)
-  }
 }
 
 // 保存联网搜索配置

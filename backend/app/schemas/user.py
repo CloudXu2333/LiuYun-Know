@@ -44,6 +44,8 @@ class User(UserBase):
     is_superuser: bool
     created_at: datetime
     updated_at: datetime
+    memory_top_k: int = 5  # 普通记忆检索数量
+    core_memory_threshold: int = 80  # 核心记忆优先级阈值
     
     class Config:
         from_attributes = True
@@ -82,4 +84,21 @@ class UserListResponse(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+# ============ 记忆设置模型 ============
+
+class MemorySettingsUpdate(BaseModel):
+    """记忆设置更新模型"""
+    memory_top_k: Optional[int] = Field(None, ge=1, le=20, description="普通记忆检索数量 (1-20)")
+    core_memory_threshold: Optional[int] = Field(None, ge=0, le=100, description="核心记忆优先级阈值 (0-100)")
+
+
+class MemorySettingsResponse(BaseModel):
+    """记忆设置响应模型"""
+    memory_top_k: int = Field(..., description="普通记忆检索数量")
+    core_memory_threshold: int = Field(..., description="核心记忆优先级阈值")
+    
+    class Config:
+        from_attributes = True
 
