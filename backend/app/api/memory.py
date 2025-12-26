@@ -38,10 +38,70 @@ class AutoExtractResponse(BaseModel):
     priority: int
 
 
+class ConflictCheckRequest(BaseModel):
+    """冲突检测请求"""
+    title: str
+    content: str
+    config_id: Optional[str] = None
+    platform_config_id: Optional[str] = None
+
+
+class ConflictCheckResponse(BaseModel):
+    """冲突检测响应"""
+    has_conflict: bool
+    conflict_type: str  # contradiction, duplicate, update, none
+    conflicting_memory_id: Optional[str] = None
+    suggested_action: str  # merge, replace, keep_both, none
+    merged_content: Optional[dict] = None
+
+
+class MemoryLimitResponse(BaseModel):
+    """记忆限制检查响应"""
+    current_tokens: int
+    limit_tokens: int
+    percentage: float
+    warning: bool
+    message: str
+
+
+class CreateMemoryWithConflictRequest(BaseModel):
+    """创建记忆请求（支持冲突处理）"""
+    title: str
+    content: str
+    category: str = "general"
+    priority: int = 0
+    is_active: bool = True
+    auto_merge: bool = False  # 是否自动合并冲突
+    config_id: Optional[str] = None
+    platform_config_id: Optional[str] = None
+
+
+class CreateMemoryWithConflictResponse(BaseModel):
+    """创建记忆响应（包含冲突信息）"""
+    memory: Optional[LongTermMemoryResponse] = None
+    conflict: Optional[ConflictCheckResponse] = None
+    action_taken: str  # created, merged, conflict_detected
+
+
 @router.get("/categories")
 async def get_categories():
     """获取记忆分类选项"""
     return MEMORY_CATEGORIES
+
+
+@router.get("/limit-check", response_model=MemoryLimitResponse)
+async def check_memory_limit(
+    max_context_tokens: int = 65536,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """检查记忆是否超过上下文限制"""
+    result = await memory_service.check_memory_limit(
+        db=db,
+        user_id=current_user.id,
+        max_context_tokens=max_context_tokens
+    )
+    return MemoryLimitResponse(**result)
 
 
 @router.get("", response_model=LongTermMemoryList)
@@ -91,12 +151,188 @@ async def create_memory(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """创建长期记忆"""
+    """创建长期记忆（简单版，不检测冲突）"""
     memory = await memory_service.create_memory(
         db=db,
         user_id=current_user.id,
         memory_data=memory_data
     )
+    return memory
+
+
+async def get_llm_client_and_model(
+    db: AsyncSession,
+    current_user: User,
+    config_id: Optional[str],
+    platform_config_id: Optional[str]
+):
+    """获取 LLM 客户端和模型"""
+    from app.services.llm_config_service import LLMConfigService, PlatformLLMConfigService
+    
+    use_api_key = None
+    use_base_url = None
+    model = None
+    
+    # 优先使用平台配置
+    if platform_config_id:
+        platform_config = await PlatformLLMConfigService.get_config(db, platform_config_id)
+        if platform_config and platform_config.is_active:
+            use_api_key = platform_config.api_key
+            use_base_url = platform_config.base_url
+            model = platform_config.model
+    # 其次使用用户配置
+    elif config_id:
+        user_config = await LLMConfigService.get_config(db, config_id, current_user)
+        if user_config:
+            use_api_key = user_config.api_key
+            use_base_url = user_config.base_url
+            model = user_config.model
+    
+    # 如果没有配置，使用默认配置
+    if not use_api_key:
+        use_api_key = settings.deepseek_api_key or settings.openai_api_key
+        use_base_url = settings.deepseek_api_base or settings.openai_api_base
+        model = "deepseek-chat" if settings.deepseek_api_key else settings.default_model
+    
+    client = llm_manager.get_client(api_key=use_api_key, base_url=use_base_url)
+    return client, model
+
+
+@router.post("/check-conflict", response_model=ConflictCheckResponse)
+async def check_conflict(
+    request: ConflictCheckRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """检测新记忆与现有记忆的冲突"""
+    client, model = await get_llm_client_and_model(
+        db, current_user, request.config_id, request.platform_config_id
+    )
+    
+    result = await memory_service.detect_conflicts(
+        db=db,
+        user_id=current_user.id,
+        new_content=request.content,
+        new_title=request.title,
+        llm_client=client,
+        model=model
+    )
+    
+    return ConflictCheckResponse(**result)
+
+
+@router.post("/create-with-conflict-check", response_model=CreateMemoryWithConflictResponse)
+async def create_memory_with_conflict_check(
+    request: CreateMemoryWithConflictRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """创建记忆并检测冲突，支持自动合并"""
+    client, model = await get_llm_client_and_model(
+        db, current_user, request.config_id, request.platform_config_id
+    )
+    
+    # 检测冲突
+    conflict_result = await memory_service.detect_conflicts(
+        db=db,
+        user_id=current_user.id,
+        new_content=request.content,
+        new_title=request.title,
+        llm_client=client,
+        model=model
+    )
+    
+    conflict_response = ConflictCheckResponse(**conflict_result)
+    
+    # 如果有冲突且开启自动合并
+    if conflict_result["has_conflict"] and request.auto_merge:
+        if conflict_result["suggested_action"] == "merge" and conflict_result["merged_content"]:
+            # 执行合并
+            merged_memory = await memory_service.merge_memories(
+                db=db,
+                user_id=current_user.id,
+                old_memory_id=conflict_result["conflicting_memory_id"],
+                merged_data=conflict_result["merged_content"]
+            )
+            if merged_memory:
+                return CreateMemoryWithConflictResponse(
+                    memory=merged_memory,
+                    conflict=conflict_response,
+                    action_taken="merged"
+                )
+        elif conflict_result["suggested_action"] == "replace":
+            # 删除旧记忆，创建新记忆
+            await memory_service.delete_memory(
+                db=db,
+                memory_id=conflict_result["conflicting_memory_id"],
+                user_id=current_user.id
+            )
+            memory_data = LongTermMemoryCreate(
+                title=request.title,
+                content=request.content,
+                category=request.category,
+                priority=request.priority,
+                is_active=request.is_active
+            )
+            new_memory = await memory_service.create_memory(
+                db=db,
+                user_id=current_user.id,
+                memory_data=memory_data
+            )
+            return CreateMemoryWithConflictResponse(
+                memory=new_memory,
+                conflict=conflict_response,
+                action_taken="created"
+            )
+    
+    # 如果有冲突但不自动合并，返回冲突信息让前端处理
+    if conflict_result["has_conflict"] and not request.auto_merge:
+        return CreateMemoryWithConflictResponse(
+            memory=None,
+            conflict=conflict_response,
+            action_taken="conflict_detected"
+        )
+    
+    # 无冲突，直接创建
+    memory_data = LongTermMemoryCreate(
+        title=request.title,
+        content=request.content,
+        category=request.category,
+        priority=request.priority,
+        is_active=request.is_active
+    )
+    new_memory = await memory_service.create_memory(
+        db=db,
+        user_id=current_user.id,
+        memory_data=memory_data
+    )
+    
+    return CreateMemoryWithConflictResponse(
+        memory=new_memory,
+        conflict=None,
+        action_taken="created"
+    )
+
+
+@router.post("/merge/{old_memory_id}", response_model=LongTermMemoryResponse)
+async def merge_memory(
+    old_memory_id: str,
+    merged_data: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """手动合并记忆"""
+    memory = await memory_service.merge_memories(
+        db=db,
+        user_id=current_user.id,
+        old_memory_id=old_memory_id,
+        merged_data=merged_data
+    )
+    if not memory:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="记忆不存在"
+        )
     return memory
 
 

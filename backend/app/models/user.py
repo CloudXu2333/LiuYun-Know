@@ -35,6 +35,7 @@ class User(Base):
     # 记忆设置
     memory_top_k = Column(Integer, default=5, nullable=False)  # 普通记忆向量检索数量，默认5条
     core_memory_threshold = Column(Integer, default=80, nullable=False)  # 核心记忆优先级阈值，默认80
+    auto_merge_memory = Column(Boolean, default=True, nullable=False)  # 自动合并冲突记忆，默认开启
     
     # 关系
     knowledge_bases = relationship("KnowledgeBase", back_populates="owner")

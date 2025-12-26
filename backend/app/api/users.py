@@ -113,11 +113,12 @@ async def get_memory_settings(current_user: User = Depends(get_current_user)):
     获取用户的记忆设置
     
     Returns:
-        记忆设置（memory_top_k, core_memory_threshold）
+        记忆设置（memory_top_k, core_memory_threshold, auto_merge_memory）
     """
     return MemorySettingsResponse(
         memory_top_k=current_user.memory_top_k,
-        core_memory_threshold=current_user.core_memory_threshold
+        core_memory_threshold=current_user.core_memory_threshold,
+        auto_merge_memory=getattr(current_user, 'auto_merge_memory', True)
     )
 
 
@@ -134,6 +135,7 @@ async def update_memory_settings(
         settings: 记忆设置
             - memory_top_k: 普通记忆检索数量 (1-20)，默认5
             - core_memory_threshold: 核心记忆优先级阈值 (0-100)，默认80
+            - auto_merge_memory: 自动合并冲突记忆，默认True
     
     Returns:
         更新后的记忆设置
@@ -141,6 +143,7 @@ async def update_memory_settings(
     说明:
         - 核心记忆（priority >= threshold）：每次对话必定加载
         - 普通记忆（priority < threshold）：根据对话内容检索 top_k 条相关记忆
+        - 自动合并：添加记忆时自动检测冲突并合并
     """
     if settings.memory_top_k is not None:
         current_user.memory_top_k = settings.memory_top_k
@@ -148,12 +151,16 @@ async def update_memory_settings(
     if settings.core_memory_threshold is not None:
         current_user.core_memory_threshold = settings.core_memory_threshold
     
+    if settings.auto_merge_memory is not None:
+        current_user.auto_merge_memory = settings.auto_merge_memory
+    
     await db.commit()
     await db.refresh(current_user)
     
     return MemorySettingsResponse(
         memory_top_k=current_user.memory_top_k,
-        core_memory_threshold=current_user.core_memory_threshold
+        core_memory_threshold=current_user.core_memory_threshold,
+        auto_merge_memory=getattr(current_user, 'auto_merge_memory', True)
     )
 
 
