@@ -60,23 +60,27 @@
             </button>
           </div>
 
-          <!-- 预设模型列表 -->
-          <div v-if="selectedProvider !== 'custom'" class="space-y-1">
+          <!-- 平台模型列表 -->
+          <div v-if="selectedProvider === 'platform'" class="space-y-1">
+            <div v-if="platformConfigs.length === 0" class="text-center py-8 text-gray-500">
+              <p class="text-sm">暂无可用模型</p>
+              <p class="text-xs mt-1">请联系管理员添加模型配置</p>
+            </div>
             <button
-              v-for="model in filteredModels"
-              :key="model.id"
-              @click="selectModel(model)"
+              v-for="config in platformConfigs"
+              :key="config.id"
+              @click="selectPlatformConfig(config)"
               class="w-full flex items-center justify-between p-2.5 rounded-lg transition-colors text-left"
-              :class="currentModel === model.id && !currentConfigId ? 'bg-blue-50 text-blue-700' : 'hover:bg-gray-50 text-gray-700'"
+              :class="currentPlatformConfigId === config.id ? 'bg-blue-50 text-blue-700' : 'hover:bg-gray-50 text-gray-700'"
             >
               <div class="flex items-center space-x-2">
-                <span class="text-base">{{ getModelIcon(model.id) }}</span>
+                <span class="text-base">{{ getModelIcon(config.model) }}</span>
                 <div>
-                  <p class="text-sm font-medium">{{ model.name }}</p>
-                  <p class="text-xs text-gray-400">{{ model.description }}</p>
+                  <p class="text-sm font-medium">{{ config.name }}</p>
+                  <p class="text-xs text-gray-400">{{ config.description || config.model }}</p>
                 </div>
               </div>
-              <svg v-if="currentModel === model.id && !currentConfigId" class="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+              <svg v-if="currentPlatformConfigId === config.id" class="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
                 <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
               </svg>
             </button>
@@ -195,6 +199,30 @@
             />
           </div>
           
+          <div>
+            <label class="block text-xs font-medium text-gray-700 mb-1">上下文限制 (Token)</label>
+            <input
+              v-model.number="customMaxContextTokens"
+              type="number"
+              min="1000"
+              step="1000"
+              placeholder="65536"
+              class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+            />
+            <div class="flex flex-wrap gap-1 mt-1">
+              <button
+                v-for="preset in [16000, 32000, 65536, 131072, 200000]"
+                :key="preset"
+                @click="customMaxContextTokens = preset"
+                type="button"
+                class="px-2 py-0.5 text-xs rounded transition-colors"
+                :class="customMaxContextTokens === preset ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'"
+              >
+                {{ preset >= 1000 ? (preset / 1000) + 'K' : preset }}
+              </button>
+            </div>
+          </div>
+          
           <div class="flex space-x-2">
             <button
               @click="testConnection"
@@ -233,7 +261,8 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
-import { getProviders, getModels, testLLMConnection, getModelGroup, getUserConfigs, createUserConfig, deleteUserConfig } from '@/api/llm'
+import { testLLMConnection, getModelGroup, getUserConfigs, createUserConfig, deleteUserConfig } from '@/api/llm'
+import { getActivePlatformConfigs } from '@/api/platformLlm'
 
 const emit = defineEmits(['update:config'])
 
@@ -241,11 +270,13 @@ const props = defineProps({
   config: {
     type: Object,
     default: () => ({
-      provider: '302ai',
-      model: 'claude-sonnet-4-5-20250929',
+      provider: 'platform',
+      model: '',
       apiKey: null,
       baseUrl: null,
-      configId: null
+      configId: null,
+      platformConfigId: null,  // 平台配置 ID
+      maxContextTokens: 65536
     })
   }
 })
@@ -254,9 +285,8 @@ const props = defineProps({
 const showDropdown = ref(false)
 const activeTab = ref('models')
 const dropdownRef = ref(null)
-const providers = ref([])
-const models = ref([])
-const selectedProvider = ref(props.config.provider || '302ai')
+const platformConfigs = ref([])  // 平台配置列表
+const selectedProvider = ref('platform')  // 默认选择平台配置
 const testing = ref(false)
 const testResult = ref(null)
 const userConfigs = ref([])
@@ -267,48 +297,55 @@ const customBaseUrl = ref('')
 const customApiKey = ref('')
 const customModel = ref('')
 const customApiStandard = ref('openai')
+const customMaxContextTokens = ref(65536)
 
 // 当前配置
-const currentProvider = ref(props.config.provider || '302ai')
-const currentModel = ref(props.config.model || 'claude-sonnet-4-5-20250929')
+const currentProvider = ref(props.config.provider || 'platform')
+const currentModel = ref(props.config.model || '')
 const currentApiKey = ref(props.config.apiKey || null)
 const currentBaseUrl = ref(props.config.baseUrl || null)
 const currentConfigId = ref(props.config.configId || null)
+const currentPlatformConfigId = ref(props.config.platformConfigId || null)
+const currentMaxContextTokens = ref(props.config.maxContextTokens || 65536)
 
 // 计算属性
 const hasCustomConfig = computed(() => {
-  return currentApiKey.value || currentBaseUrl.value || currentConfigId.value
+  return currentConfigId.value !== null
 })
 
 const currentModelName = computed(() => {
-  // 如果使用的是保存的配置，显示配置名称
+  // 如果使用的是用户自定义配置
   if (currentConfigId.value) {
     const config = userConfigs.value.find(c => c.id === currentConfigId.value)
     return config?.name || currentModel.value
   }
-  const model = models.value.find(m => m.id === currentModel.value)
-  return model?.name || currentModel.value || '选择模型'
+  // 如果使用的是平台配置
+  if (currentPlatformConfigId.value) {
+    const config = platformConfigs.value.find(c => c.id === currentPlatformConfigId.value)
+    return config?.name || currentModel.value
+  }
+  return currentModel.value || '选择模型'
 })
 
 const currentModelIcon = computed(() => {
   if (currentConfigId.value) {
     return '⚙️'
   }
-  const group = getModelGroup(currentModel.value)
-  return group.icon
-})
-
-// 合并提供商列表（包含自定义选项）
-const allProviders = computed(() => {
-  const customProvider = { id: 'custom', name: '自定义' }
-  return [...providers.value.filter(p => p.id !== 'custom'), customProvider]
-})
-
-const filteredModels = computed(() => {
-  if (selectedProvider.value === 'custom') {
-    return []
+  if (currentPlatformConfigId.value) {
+    const config = platformConfigs.value.find(c => c.id === currentPlatformConfigId.value)
+    if (config) {
+      return getModelIcon(config.model)
+    }
   }
-  return models.value.filter(m => m.provider === selectedProvider.value)
+  return getModelIcon(currentModel.value)
+})
+
+// 提供商列表：平台配置 + 自定义
+const allProviders = computed(() => {
+  return [
+    { id: 'platform', name: '平台模型' },
+    { id: 'custom', name: '自定义' }
+  ]
 })
 
 const canSaveConfig = computed(() => {
@@ -321,17 +358,19 @@ function toggleDropdown() {
 }
 
 function getModelIcon(modelId) {
+  if (!modelId) return '🤖'
   const group = getModelGroup(modelId)
   return group.icon
 }
 
-function selectModel(model) {
-  currentModel.value = model.id
-  currentProvider.value = model.provider
-  selectedProvider.value = model.provider
+function selectPlatformConfig(config) {
+  currentModel.value = config.model
+  currentProvider.value = 'platform'
+  currentPlatformConfigId.value = config.id
   currentConfigId.value = null
-  currentApiKey.value = null
-  currentBaseUrl.value = null
+  currentApiKey.value = null  // 平台配置不暴露 API Key
+  currentBaseUrl.value = config.base_url
+  currentMaxContextTokens.value = config.max_context_tokens || 65536
   emitConfig()
   showDropdown.value = false
 }
@@ -368,7 +407,8 @@ async function saveCurrentConfig() {
       model: customModel.value.trim(),
       api_key: customApiKey.value.trim(),
       base_url: customBaseUrl.value.trim() || null,
-      api_standard: customApiStandard.value
+      api_standard: customApiStandard.value,
+      max_context_tokens: customMaxContextTokens.value
     })
     
     // 重新加载配置列表
@@ -380,6 +420,7 @@ async function saveCurrentConfig() {
     customBaseUrl.value = ''
     customModel.value = ''
     customApiStandard.value = 'openai'
+    customMaxContextTokens.value = 65536
     
     testResult.value = {
       success: true,
@@ -406,6 +447,8 @@ async function useSavedConfig(config) {
   currentBaseUrl.value = config.base_url
   currentProvider.value = 'custom'
   currentConfigId.value = config.id
+  currentPlatformConfigId.value = null
+  currentMaxContextTokens.value = config.max_context_tokens || 65536
   emitConfig()
   showDropdown.value = false
 }
@@ -425,14 +468,20 @@ async function deleteSavedConfig(configId) {
     await deleteUserConfig(configId)
     await loadUserConfigs()
     
-    // 如果删除的是当前使用的配置，重置为默认
+    // 如果删除的是当前使用的配置，重置为默认（选择第一个平台配置）
     if (currentConfigId.value === configId) {
       currentConfigId.value = null
       currentApiKey.value = null
       currentBaseUrl.value = null
-      currentProvider.value = '302ai'
-      currentModel.value = 'claude-sonnet-4-5-20250929'
-      emitConfig()
+      currentProvider.value = 'platform'
+      if (platformConfigs.value.length > 0) {
+        selectPlatformConfig(platformConfigs.value[0])
+      } else {
+        currentModel.value = ''
+        currentPlatformConfigId.value = null
+        currentMaxContextTokens.value = 65536
+        emitConfig()
+      }
     }
     
     ElMessage.success('删除成功')
@@ -450,7 +499,9 @@ function emitConfig() {
     model: currentModel.value,
     apiKey: currentApiKey.value,
     baseUrl: currentBaseUrl.value,
-    configId: currentConfigId.value
+    configId: currentConfigId.value,
+    platformConfigId: currentPlatformConfigId.value,
+    maxContextTokens: currentMaxContextTokens.value
   })
 }
 
@@ -461,17 +512,16 @@ function handleClickOutside(event) {
   }
 }
 
-// 加载数据
-async function loadData() {
+// 加载平台配置
+async function loadPlatformConfigs() {
   try {
-    const [providersRes, modelsRes] = await Promise.all([
-      getProviders(),
-      getModels()
-    ])
-    providers.value = providersRes
-    models.value = modelsRes
+    platformConfigs.value = await getActivePlatformConfigs()
+    // 如果当前没有选择任何配置，默认选择第一个平台配置
+    if (!currentPlatformConfigId.value && !currentConfigId.value && platformConfigs.value.length > 0) {
+      selectPlatformConfig(platformConfigs.value[0])
+    }
   } catch (error) {
-    console.error('加载 LLM 配置失败:', error)
+    console.error('加载平台配置失败:', error)
   }
 }
 
@@ -487,19 +537,23 @@ async function loadUserConfigs() {
 // 监听 props 变化
 watch(() => props.config, (newConfig) => {
   if (newConfig) {
-    currentProvider.value = newConfig.provider || '302ai'
-    currentModel.value = newConfig.model || 'claude-sonnet-4-5-20250929'
+    currentProvider.value = newConfig.provider || 'platform'
+    currentModel.value = newConfig.model || ''
     currentApiKey.value = newConfig.apiKey || null
     currentBaseUrl.value = newConfig.baseUrl || null
     currentConfigId.value = newConfig.configId || null
-    if (newConfig.provider !== 'custom') {
-      selectedProvider.value = newConfig.provider || '302ai'
+    currentPlatformConfigId.value = newConfig.platformConfigId || null
+    currentMaxContextTokens.value = newConfig.maxContextTokens || 65536
+    if (newConfig.provider === 'platform') {
+      selectedProvider.value = 'platform'
+    } else if (newConfig.configId) {
+      selectedProvider.value = 'custom'
     }
   }
 }, { deep: true })
 
 onMounted(() => {
-  loadData()
+  loadPlatformConfigs()
   loadUserConfigs()
   document.addEventListener('click', handleClickOutside)
 })

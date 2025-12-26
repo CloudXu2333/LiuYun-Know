@@ -63,6 +63,7 @@ export const useAuthStore = defineStore('auth', () => {
     // 清除 localStorage
     localStorage.removeItem('access_token')
     localStorage.removeItem('refresh_token')
+    localStorage.removeItem('llm_config')
   }
   
   /**

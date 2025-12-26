@@ -26,6 +26,8 @@ router = APIRouter(prefix="/memory", tags=["memory"])
 class AutoExtractRequest(BaseModel):
     """AI自动提取记忆请求"""
     content: str  # 要提取的内容
+    config_id: Optional[str] = None  # 用户配置 ID
+    platform_config_id: Optional[str] = None  # 平台配置 ID
 
 
 class AutoExtractResponse(BaseModel):
@@ -162,10 +164,12 @@ async def toggle_memory(
 @router.post("/auto-extract", response_model=AutoExtractResponse)
 async def auto_extract_memory(
     request: AutoExtractRequest,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
 ):
     """AI自动提取记忆：分析内容并返回标题、分类、优先级"""
     import json
+    from app.services.llm_config_service import LLMConfigService, PlatformLLMConfigService
     
     system_prompt = """你是一个记忆提取助手。用户会给你一段内容，你需要分析并提取出适合作为长期记忆存储的信息。
 
@@ -184,14 +188,41 @@ async def auto_extract_memory(
     user_prompt = f"请分析以下内容并提取记忆：\n\n{request.content}"
     
     try:
-        # 使用DeepSeek模型
+        # 确定使用的 API 配置
+        use_api_key = None
+        use_base_url = None
+        model = None
+        
+        # 优先使用平台配置
+        if request.platform_config_id:
+            platform_config = await PlatformLLMConfigService.get_config(db, request.platform_config_id)
+            if platform_config and platform_config.is_active:
+                use_api_key = platform_config.api_key
+                use_base_url = platform_config.base_url
+                model = platform_config.model
+                print(f"[Memory] Using platform config: {platform_config.name}")
+        # 其次使用用户配置
+        elif request.config_id:
+            user_config = await LLMConfigService.get_config(db, request.config_id, current_user)
+            if user_config:
+                use_api_key = user_config.api_key
+                use_base_url = user_config.base_url
+                model = user_config.model
+                print(f"[Memory] Using user config: {user_config.name}")
+        
+        # 如果没有配置，使用默认配置
+        if not use_api_key:
+            use_api_key = settings.deepseek_api_key or settings.openai_api_key
+            use_base_url = settings.deepseek_api_base or settings.openai_api_base
+            model = "deepseek-chat" if settings.deepseek_api_key else settings.default_model
+        
         client = llm_manager.get_client(
-            api_key=settings.deepseek_api_key,
-            base_url=settings.deepseek_api_base
+            api_key=use_api_key,
+            base_url=use_base_url
         )
         
         response = await client.chat.completions.create(
-            model="deepseek-chat",
+            model=model,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}

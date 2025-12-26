@@ -92,6 +92,14 @@
                     用户管理
                   </button>
                   <button
+                    v-if="authStore.user?.is_superuser"
+                    @click="goToAdminLLMConfigs"
+                    class="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center"
+                  >
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                    模型配置
+                  </button>
+                  <button
                     @click="handleLogout"
                     class="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center"
                   >
@@ -795,80 +803,6 @@
                     :config="llmConfig" 
                     @update:config="handleLLMConfigUpdate"
                   />
-                  
-                  <!-- 上下文设置按钮 -->
-                  <div class="relative">
-                    <button
-                      @click="showContextSettings = !showContextSettings"
-                      class="p-2 rounded-full transition-colors text-gray-400 hover:text-blue-500 hover:bg-blue-50"
-                      title="上下文设置"
-                    >
-                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                      </svg>
-                    </button>
-                    
-                    <!-- 上下文设置面板 -->
-                    <transition
-                      enter-active-class="transition ease-out duration-200"
-                      enter-from-class="transform opacity-0 scale-95"
-                      enter-to-class="transform opacity-100 scale-100"
-                      leave-active-class="transition ease-in duration-75"
-                      leave-from-class="transform opacity-100 scale-100"
-                      leave-to-class="transform opacity-0 scale-95"
-                    >
-                      <div
-                        v-show="showContextSettings"
-                        class="absolute bottom-full right-0 mb-2 w-72 rounded-xl shadow-gemini-xl bg-white ring-1 ring-black ring-opacity-5 focus:outline-none py-3 px-4"
-                      >
-                        <div class="flex items-center justify-between mb-3">
-                          <h3 class="text-sm font-medium text-gray-900">上下文设置</h3>
-                          <button @click="showContextSettings = false" class="text-gray-400 hover:text-gray-600">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                            </svg>
-                          </button>
-                        </div>
-                        
-                        <div class="space-y-3">
-                          <div>
-                            <label class="block text-xs text-gray-600 mb-1">最大上下文 Token 数</label>
-                            <input
-                              v-model.number="contextConfig.max_context_tokens"
-                              type="number"
-                              min="1000"
-                              step="1000"
-                              class="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              placeholder="16000"
-                            />
-                            <p class="text-xs text-gray-400 mt-1">超过此限制时，旧消息会被自动压缩</p>
-                          </div>
-                          
-                          <!-- 快捷选项 -->
-                          <div class="flex flex-wrap gap-2">
-                            <button
-                              v-for="preset in [4000, 8000, 16000, 32000]"
-                              :key="preset"
-                              @click="contextConfig.max_context_tokens = preset"
-                              class="px-2 py-1 text-xs rounded-md transition-colors"
-                              :class="contextConfig.max_context_tokens === preset ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
-                            >
-                              {{ preset / 1000 }}K
-                            </button>
-                          </div>
-                        </div>
-                        
-                        <!-- 保存按钮 -->
-                        <button
-                          @click="saveContextConfig"
-                          class="w-full mt-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                        >
-                          保存设置
-                        </button>
-                      </div>
-                    </transition>
-                  </div>
                </div>
                
                <p class="text-xs text-gray-400 text-center">
@@ -1037,12 +971,6 @@ const webSearchConfig = ref({
 })
 let abortController = null
 
-// 上下文设置
-const showContextSettings = ref(false)
-const contextConfig = ref({
-  max_context_tokens: 16000  // 默认 16k
-})
-
 // 来源详情对话框
 const sourceDialogVisible = ref(false)
 const sourceDialogType = ref('')  // 'graph' | 'chunk' | 'memory'
@@ -1056,11 +984,13 @@ const sourceDialogTitle = computed(() => {
 
 // LLM 配置
 const llmConfig = ref({
-  provider: '302ai',
-  model: 'claude-sonnet-4-5-20250929',
+  provider: 'platform',
+  model: '',
   apiKey: null,
   baseUrl: null,
-  configId: null
+  configId: null,
+  platformConfigId: null,  // 平台配置 ID
+  maxContextTokens: 65536
 })
 
 // 更新 LLM 配置
@@ -1082,25 +1012,6 @@ const loadLLMConfig = () => {
       console.error('Failed to load LLM config:', e)
     }
   }
-}
-
-// 加载上下文配置
-const loadContextConfig = () => {
-  const saved = localStorage.getItem('context_config')
-  if (saved) {
-    try {
-      contextConfig.value = JSON.parse(saved)
-    } catch (e) {
-      console.error('Failed to load context config:', e)
-    }
-  }
-}
-
-// 保存上下文配置
-const saveContextConfig = () => {
-  localStorage.setItem('context_config', JSON.stringify(contextConfig.value))
-  showContextSettings.value = false
-  ElMessage.success('上下文设置已保存')
 }
 
 // Refs
@@ -1375,6 +1286,8 @@ const sendMessageStreamWithAbort = async (data, signal, onMessage, onDone, onErr
       api_key: llmConfig.value.apiKey,
       base_url: llmConfig.value.baseUrl,
       config_id: llmConfig.value.configId,
+      platform_config_id: llmConfig.value.platformConfigId,
+      max_context_tokens: llmConfig.value.maxContextTokens || 65536,
       knowledge_base_id: selectedKnowledgeBase.value?.id ? String(selectedKnowledgeBase.value.id) : null,
       enable_web_search: enableWebSearch.value,
       web_search_config: enableWebSearch.value ? {
@@ -1393,6 +1306,8 @@ const sendMessageStreamWithAbort = async (data, signal, onMessage, onDone, onErr
       hasApiKey: !!requestData.api_key,
       baseUrl: requestData.base_url,
       configId: requestData.config_id,
+      platformConfigId: requestData.platform_config_id,
+      maxContextTokens: requestData.max_context_tokens,
       knowledge_base_id: requestData.knowledge_base_id,
       enable_web_search: requestData.enable_web_search
     })
@@ -1772,6 +1687,11 @@ const handleLogout = async () => {
 const goToAdminUsers = () => {
   showUserMenu.value = false
   router.push('/admin/users')
+}
+
+const goToAdminLLMConfigs = () => {
+  showUserMenu.value = false
+  router.push('/admin/llm-configs')
 }
 
 // 编辑用户消息

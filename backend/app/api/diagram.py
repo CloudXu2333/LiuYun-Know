@@ -29,6 +29,8 @@ class DiagramRequest(BaseModel):
     model: Optional[str] = None
     api_key: Optional[str] = None
     base_url: Optional[str] = None
+    config_id: Optional[str] = None  # 用户配置 ID
+    platform_config_id: Optional[str] = None  # 平台配置 ID
 
 
 DIAGRAM_SYSTEM_PROMPT = """你是一个专业的流程图设计助手。你可以使用 create_diagram 工具来创建流程图。
@@ -137,22 +139,39 @@ async def generate_diagram_stream(
             
             # 确定使用的 API 配置
             from app.config import settings
+            from app.services.llm_config_service import LLMConfigService, PlatformLLMConfigService
             
-            # 默认使用 DeepSeek
-            use_api_key = settings.deepseek_api_key
-            use_base_url = settings.deepseek_api_base
-            model = "deepseek-chat"
+            use_api_key = None
+            use_base_url = None
+            model = None
             
-            # 如果用户明确指定了配置，则使用用户的配置
-            if request.api_key:
+            # 优先使用平台配置
+            if request.platform_config_id:
+                platform_config = await PlatformLLMConfigService.get_config(db, request.platform_config_id)
+                if platform_config and platform_config.is_active:
+                    use_api_key = platform_config.api_key
+                    use_base_url = platform_config.base_url
+                    model = platform_config.model
+                    print(f"[Diagram] Using platform config: {platform_config.name}")
+            # 其次使用用户配置
+            elif request.config_id:
+                user_config = await LLMConfigService.get_config(db, request.config_id, current_user)
+                if user_config:
+                    use_api_key = user_config.api_key
+                    use_base_url = user_config.base_url
+                    model = user_config.model
+                    print(f"[Diagram] Using user config: {user_config.name}")
+            # 最后使用请求中的配置
+            elif request.api_key:
                 use_api_key = request.api_key
-                use_base_url = request.base_url or settings.openai_api_base
-                model = request.model or settings.default_model
-            elif request.model and request.model != "deepseek-chat":
-                # 用户指定了其他模型但没有指定 api_key，使用默认 openai 配置
-                use_api_key = settings.openai_api_key
-                use_base_url = request.base_url or settings.openai_api_base
+                use_base_url = request.base_url
                 model = request.model
+            
+            # 如果还没有配置，使用默认配置
+            if not use_api_key:
+                use_api_key = settings.deepseek_api_key or settings.openai_api_key
+                use_base_url = settings.deepseek_api_base or settings.openai_api_base
+                model = "deepseek-chat" if settings.deepseek_api_key else settings.default_model
             
             # 创建客户端
             client = llm_manager.get_client(use_api_key, use_base_url)

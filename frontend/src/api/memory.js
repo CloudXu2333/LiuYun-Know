@@ -78,9 +78,16 @@ export const toggleMemory = async (id) => {
 /**
  * AI自动提取记忆
  * @param {string} content - 要提取的内容
+ * @param {Object} options - 可选参数
+ * @param {string} options.config_id - 用户配置 ID
+ * @param {string} options.platform_config_id - 平台配置 ID
  * @returns {Promise<{title: string, content: string, category: string, priority: number}>}
  */
-export const autoExtractMemory = async (content) => {
-  const response = await axios.post('/memory/auto-extract', { content })
+export const autoExtractMemory = async (content, options = {}) => {
+  const response = await axios.post('/memory/auto-extract', {
+    content,
+    config_id: options.config_id || null,
+    platform_config_id: options.platform_config_id || null
+  })
   return response.data
 }

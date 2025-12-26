@@ -225,24 +225,23 @@ const handleSend = async () => {
   logs.value = []
   scrollToBottom()
 
-  // 获取用户选择的 LLM 配置（与主对话页面一致），默认使用 DeepSeek
+  // 获取用户选择的 LLM 配置（与主对话页面一致）
   let llmConfig = {
-    model: 'deepseek-chat',
+    model: null,
     api_key: null,
-    base_url: 'https://api.deepseek.com',
-    provider: 'deepseek'
+    base_url: null,
+    config_id: null,
+    platform_config_id: null
   }
   try {
     const saved = localStorage.getItem('llm_config')
     if (saved) {
       const config = JSON.parse(saved)
-      // 只有当用户明确选择了其他模型时才覆盖默认的 DeepSeek
-      if (config.model && config.provider !== 'deepseek') {
-        llmConfig.model = config.model
-        llmConfig.api_key = config.apiKey
-        llmConfig.base_url = config.baseUrl
-        llmConfig.provider = config.provider
-      }
+      llmConfig.model = config.model
+      llmConfig.api_key = config.apiKey
+      llmConfig.base_url = config.baseUrl
+      llmConfig.config_id = config.configId
+      llmConfig.platform_config_id = config.platformConfigId
     }
   } catch (e) {
     console.error('Failed to load LLM config:', e)
@@ -260,7 +259,9 @@ const handleSend = async () => {
         conversation_history: conversationHistory.value,
         model: llmConfig.model,
         api_key: llmConfig.api_key,
-        base_url: llmConfig.base_url
+        base_url: llmConfig.base_url,
+        config_id: llmConfig.config_id,
+        platform_config_id: llmConfig.platform_config_id
       })
     })
 

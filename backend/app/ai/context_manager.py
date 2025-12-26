@@ -12,7 +12,7 @@ from app.ai.llm_manager import llm_manager
 class ContextManager:
     """上下文管理器 - 整合长期记忆和短期记忆"""
     
-    def __init__(self, max_context_tokens: int = 16000):
+    def __init__(self, max_context_tokens: int = 65536):
         """
         初始化上下文管理器
         
@@ -302,4 +302,4 @@ class ContextManager:
 
 
 # 创建全局实例
-context_manager = ContextManager(max_context_tokens=16000)
+context_manager = ContextManager(max_context_tokens=65536)

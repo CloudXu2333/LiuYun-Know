@@ -157,3 +157,89 @@ class LLMConfigService:
         for config in configs:
             config.is_default = False
         await db.flush()
+
+
+# ============ 平台级 LLM 配置服务 ============
+
+from app.models.llm_config import PlatformLLMConfig
+from app.schemas.llm_config import PlatformLLMConfigCreate, PlatformLLMConfigUpdate
+
+
+class PlatformLLMConfigService:
+    """平台级 LLM 配置服务"""
+    
+    @staticmethod
+    async def create_config(
+        db: AsyncSession,
+        config_data: PlatformLLMConfigCreate
+    ) -> PlatformLLMConfig:
+        """创建平台配置"""
+        config = PlatformLLMConfig(
+            name=config_data.name,
+            provider=config_data.provider,
+            model=config_data.model,
+            api_key=config_data.api_key,
+            base_url=config_data.base_url,
+            api_standard=config_data.api_standard or "openai",
+            max_context_tokens=config_data.max_context_tokens,
+            description=config_data.description,
+            is_active=config_data.is_active,
+            sort_order=config_data.sort_order
+        )
+        
+        db.add(config)
+        await db.flush()
+        await db.refresh(config)
+        
+        return config
+    
+    @staticmethod
+    async def get_all_configs(db: AsyncSession) -> List[PlatformLLMConfig]:
+        """获取所有平台配置（管理员用）"""
+        result = await db.execute(
+            select(PlatformLLMConfig)
+            .order_by(PlatformLLMConfig.sort_order, PlatformLLMConfig.created_at.desc())
+        )
+        return list(result.scalars().all())
+    
+    @staticmethod
+    async def get_active_configs(db: AsyncSession) -> List[PlatformLLMConfig]:
+        """获取所有启用的平台配置（普通用户用）"""
+        result = await db.execute(
+            select(PlatformLLMConfig)
+            .where(PlatformLLMConfig.is_active == True)
+            .order_by(PlatformLLMConfig.sort_order, PlatformLLMConfig.created_at.desc())
+        )
+        return list(result.scalars().all())
+    
+    @staticmethod
+    async def get_config(db: AsyncSession, config_id: str) -> Optional[PlatformLLMConfig]:
+        """获取单个配置"""
+        result = await db.execute(
+            select(PlatformLLMConfig).where(PlatformLLMConfig.id == config_id)
+        )
+        return result.scalar_one_or_none()
+    
+    @staticmethod
+    async def update_config(
+        db: AsyncSession,
+        config: PlatformLLMConfig,
+        config_data: PlatformLLMConfigUpdate
+    ) -> PlatformLLMConfig:
+        """更新配置"""
+        update_data = config_data.model_dump(exclude_unset=True)
+        
+        for field, value in update_data.items():
+            setattr(config, field, value)
+        
+        await db.flush()
+        await db.refresh(config)
+        
+        return config
+    
+    @staticmethod
+    async def delete_config(db: AsyncSession, config: PlatformLLMConfig) -> bool:
+        """删除配置"""
+        await db.delete(config)
+        await db.flush()
+        return True

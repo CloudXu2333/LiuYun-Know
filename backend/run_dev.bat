@@ -29,9 +29,6 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM 创建数据目录
-if not exist "..\data\sqlite" mkdir "..\data\sqlite"
-
 echo.
 echo ========================================
 echo Server starting at http://localhost:8000

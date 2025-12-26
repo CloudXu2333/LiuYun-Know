@@ -60,13 +60,14 @@ class ChatWithModelRequest(BaseModel):
     api_key: Optional[str] = Field(None, description="自定义 API Key")
     base_url: Optional[str] = Field(None, description="自定义 Base URL")
     config_id: Optional[str] = Field(None, description="用户保存的配置 ID")
+    platform_config_id: Optional[str] = Field(None, description="平台配置 ID")
     # 知识库配置
     knowledge_base_id: Optional[str] = Field(None, description="知识库 ID")
     # 联网搜索配置
     enable_web_search: bool = Field(default=False, description="是否启用联网搜索")
     web_search_config: Optional[WebSearchConfig] = Field(None, description="联网搜索自定义配置")
     # 上下文配置
-    max_context_tokens: int = Field(default=16000, ge=1000, description="最大上下文 token 数，超过时自动压缩旧消息")
+    max_context_tokens: int = Field(default=65536, ge=1000, description="最大上下文 token 数，超过时自动压缩旧消息")
 
 
 class UserLLMConfigCreate(BaseModel):
@@ -77,6 +78,7 @@ class UserLLMConfigCreate(BaseModel):
     api_key: str = Field(..., description="API Key")
     base_url: Optional[str] = Field(None, description="Base URL（可选，会根据 provider 自动设置）")
     api_standard: Optional[str] = Field("openai", description="API 标准：openai/gemini/anthropic")
+    max_context_tokens: int = Field(default=65536, ge=1000, description="最大上下文 token 数，默认 64k")
     description: Optional[str] = Field(None, max_length=500, description="描述")
     is_default: bool = Field(default=False, description="是否为默认配置")
 
@@ -89,6 +91,7 @@ class UserLLMConfigUpdate(BaseModel):
     api_key: Optional[str] = None
     base_url: Optional[str] = None
     api_standard: Optional[str] = None
+    max_context_tokens: Optional[int] = Field(None, ge=1000, description="最大上下文 token 数")
     description: Optional[str] = Field(None, max_length=500)
     is_default: Optional[bool] = None
 
@@ -102,6 +105,7 @@ class UserLLMConfigResponse(BaseModel):
     api_key: str  # 前端需要显示（部分隐藏）
     base_url: str
     api_standard: Optional[str] = "openai"
+    max_context_tokens: int = 65536  # 最大上下文 token 数，默认 64k
     description: Optional[str]
     is_default: bool
     created_at: datetime
@@ -146,3 +150,68 @@ DEFAULT_MODELS = [
     # DeepSeek 模型（可用）
     LLMModelInfo(id="deepseek-chat", name="DeepSeek Chat", provider="deepseek", description="DeepSeek 对话模型"),
 ]
+
+
+# ============ 平台级 LLM 配置 ============
+
+class PlatformLLMConfigCreate(BaseModel):
+    """创建平台级 LLM 配置"""
+    name: str = Field(..., min_length=1, max_length=100, description="配置名称")
+    provider: str = Field(..., description="提供商 ID")
+    model: str = Field(..., description="模型名称")
+    api_key: str = Field(..., description="API Key")
+    base_url: str = Field(..., description="Base URL")
+    api_standard: Optional[str] = Field("openai", description="API 标准：openai/gemini/anthropic")
+    max_context_tokens: int = Field(default=65536, ge=1000, description="最大上下文 token 数")
+    description: Optional[str] = Field(None, max_length=500, description="描述")
+    is_active: bool = Field(default=True, description="是否启用")
+    sort_order: int = Field(default=0, description="排序顺序")
+
+
+class PlatformLLMConfigUpdate(BaseModel):
+    """更新平台级 LLM 配置"""
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    provider: Optional[str] = None
+    model: Optional[str] = None
+    api_key: Optional[str] = None
+    base_url: Optional[str] = None
+    api_standard: Optional[str] = None
+    max_context_tokens: Optional[int] = Field(None, ge=1000)
+    description: Optional[str] = Field(None, max_length=500)
+    is_active: Optional[bool] = None
+    sort_order: Optional[int] = None
+
+
+class PlatformLLMConfigResponse(BaseModel):
+    """平台级 LLM 配置响应"""
+    id: str
+    name: str
+    provider: str
+    model: str
+    api_key: str  # 管理员可见完整 key
+    base_url: str
+    api_standard: Optional[str] = "openai"
+    max_context_tokens: int = 65536
+    description: Optional[str]
+    is_active: bool
+    sort_order: int
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class PlatformLLMConfigPublic(BaseModel):
+    """平台级 LLM 配置（公开信息，不含 API Key）"""
+    id: str
+    name: str
+    provider: str
+    model: str
+    base_url: str
+    api_standard: Optional[str] = "openai"
+    max_context_tokens: int = 65536
+    description: Optional[str]
+    
+    class Config:
+        from_attributes = True

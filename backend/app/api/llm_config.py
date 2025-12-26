@@ -6,21 +6,23 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from pydantic import BaseModel
 import json
 import traceback
 
 from app.core.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, get_current_superuser
 from app.models.user import User
 from app.models.conversation import MessageRole
 from app.schemas.llm_config import (
     LLMProvider, LLMModelInfo, LLMConfigResponse,
     ChatWithModelRequest, DEFAULT_PROVIDERS, DEFAULT_MODELS,
-    UserLLMConfigCreate, UserLLMConfigUpdate, UserLLMConfigResponse
+    UserLLMConfigCreate, UserLLMConfigUpdate, UserLLMConfigResponse,
+    PlatformLLMConfigCreate, PlatformLLMConfigUpdate, PlatformLLMConfigResponse, PlatformLLMConfigPublic
 )
 from app.schemas.chat import ConversationCreate, ConversationResponse, MessageResponse
 from app.services.chat_service import ChatService
-from app.services.llm_config_service import LLMConfigService
+from app.services.llm_config_service import LLMConfigService, PlatformLLMConfigService
 from app.services.knowledge_base_service import KnowledgeBaseService
 from app.ai.llm_manager import llm_manager
 from app.ai.agent import conversation_agent
@@ -98,14 +100,25 @@ async def chat_with_model_stream(
     api_key = request.api_key
     base_url = request.base_url
     model = request.model
+    max_context_tokens = request.max_context_tokens
     
-    # 如果指定了保存的配置 ID，使用保存的配置
-    if request.config_id:
+    # 优先使用平台配置
+    if request.platform_config_id:
+        platform_config = await PlatformLLMConfigService.get_config(db, request.platform_config_id)
+        if platform_config and platform_config.is_active:
+            api_key = platform_config.api_key
+            base_url = platform_config.base_url
+            model = platform_config.model
+            max_context_tokens = platform_config.max_context_tokens
+            print(f"[LLM Config] Using platform config: {platform_config.name}")
+    # 如果指定了用户保存的配置 ID，使用保存的配置
+    elif request.config_id:
         saved_config = await LLMConfigService.get_config(db, request.config_id, current_user)
         if saved_config:
             api_key = saved_config.api_key
             base_url = saved_config.base_url
             model = saved_config.model
+            max_context_tokens = saved_config.max_context_tokens
             print(f"[LLM Config] Using saved config: {saved_config.name}")
     
     # 调试日志
@@ -184,7 +197,7 @@ async def chat_with_model_stream(
                 api_key=api_key,
                 base_url=base_url,
                 system_prompt="你是一个有帮助的AI助手。请用中文回答问题。",
-                max_context_tokens=request.max_context_tokens,
+                max_context_tokens=max_context_tokens,
                 db=db,  # 传入数据库会话
                 user_id=current_user.id,  # 传入用户 ID
                 memory_top_k=current_user.memory_top_k,  # 用户配置的普通记忆检索数量
@@ -415,3 +428,170 @@ async def delete_user_config(
     await LLMConfigService.delete_config(db, config)
     await db.commit()
     return None
+
+
+
+# ============ 平台级配置管理（管理员） ============
+
+@router.post("/platform-configs", response_model=PlatformLLMConfigResponse, status_code=status.HTTP_201_CREATED)
+async def create_platform_config(
+    config_data: PlatformLLMConfigCreate,
+    current_user: User = Depends(get_current_superuser),
+    db: AsyncSession = Depends(get_db)
+):
+    """创建平台级 LLM 配置（仅管理员）"""
+    config = await PlatformLLMConfigService.create_config(db, config_data)
+    await db.commit()
+    await db.refresh(config)
+    return config
+
+
+@router.get("/platform-configs", response_model=List[PlatformLLMConfigResponse])
+async def get_platform_configs(
+    current_user: User = Depends(get_current_superuser),
+    db: AsyncSession = Depends(get_db)
+):
+    """获取所有平台级 LLM 配置（仅管理员）"""
+    configs = await PlatformLLMConfigService.get_all_configs(db)
+    return configs
+
+
+@router.get("/platform-configs/active", response_model=List[PlatformLLMConfigPublic])
+async def get_active_platform_configs(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """获取所有启用的平台级配置（普通用户，不含 API Key）"""
+    configs = await PlatformLLMConfigService.get_active_configs(db)
+    return configs
+
+
+@router.get("/platform-configs/{config_id}", response_model=PlatformLLMConfigResponse)
+async def get_platform_config(
+    config_id: str,
+    current_user: User = Depends(get_current_superuser),
+    db: AsyncSession = Depends(get_db)
+):
+    """获取单个平台配置（仅管理员）"""
+    config = await PlatformLLMConfigService.get_config(db, config_id)
+    if not config:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="配置不存在"
+        )
+    return config
+
+
+@router.put("/platform-configs/{config_id}", response_model=PlatformLLMConfigResponse)
+async def update_platform_config(
+    config_id: str,
+    config_data: PlatformLLMConfigUpdate,
+    current_user: User = Depends(get_current_superuser),
+    db: AsyncSession = Depends(get_db)
+):
+    """更新平台配置（仅管理员）"""
+    config = await PlatformLLMConfigService.get_config(db, config_id)
+    if not config:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="配置不存在"
+        )
+    
+    updated_config = await PlatformLLMConfigService.update_config(db, config, config_data)
+    await db.commit()
+    await db.refresh(updated_config)
+    return updated_config
+
+
+@router.delete("/platform-configs/{config_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_platform_config(
+    config_id: str,
+    current_user: User = Depends(get_current_superuser),
+    db: AsyncSession = Depends(get_db)
+):
+    """删除平台配置（仅管理员）"""
+    config = await PlatformLLMConfigService.get_config(db, config_id)
+    if not config:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="配置不存在"
+        )
+    
+    await PlatformLLMConfigService.delete_config(db, config)
+    await db.commit()
+    return None
+
+
+class PlatformConfigTestRequest(BaseModel):
+    """平台配置测试请求"""
+    model: str
+    api_key: str
+    base_url: str
+
+
+@router.post("/platform-configs/test")
+async def test_platform_config_direct(
+    request: PlatformConfigTestRequest,
+    current_user: User = Depends(get_current_superuser)
+):
+    """测试平台配置连接（直接传入配置，仅管理员）"""
+    try:
+        messages = [{"role": "user", "content": "请用一句话介绍你自己。"}]
+        response = await llm_manager.chat_completion(
+            messages=messages,
+            model=request.model,
+            api_key=request.api_key,
+            base_url=request.base_url,
+            max_tokens=100,
+        )
+        
+        content = response.choices[0].message.content
+        return {
+            "success": True,
+            "message": f"连接成功: {content[:50]}..." if len(content) > 50 else f"连接成功: {content}",
+            "model": request.model
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"连接失败: {str(e)}",
+            "model": request.model
+        }
+
+
+@router.post("/platform-configs/{config_id}/test")
+async def test_platform_config_by_id(
+    config_id: str,
+    current_user: User = Depends(get_current_superuser),
+    db: AsyncSession = Depends(get_db)
+):
+    """测试已保存的平台配置连接（仅管理员）"""
+    config = await PlatformLLMConfigService.get_config(db, config_id)
+    if not config:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="配置不存在"
+        )
+    
+    try:
+        messages = [{"role": "user", "content": "请用一句话介绍你自己。"}]
+        response = await llm_manager.chat_completion(
+            messages=messages,
+            model=config.model,
+            api_key=config.api_key,
+            base_url=config.base_url,
+            max_tokens=100,
+        )
+        
+        content = response.choices[0].message.content
+        return {
+            "success": True,
+            "message": f"连接成功: {content[:50]}..." if len(content) > 50 else f"连接成功: {content}",
+            "model": config.model
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"连接失败: {str(e)}",
+            "model": config.model
+        }

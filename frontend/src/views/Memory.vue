@@ -530,7 +530,23 @@ const handleAutoExtract = async () => {
   
   extracting.value = true
   try {
-    const result = await autoExtractMemory(autoExtractInput.value.trim())
+    // 从 localStorage 获取用户选择的模型配置
+    const llmConfigStr = localStorage.getItem('llm_config')
+    const options = {}
+    if (llmConfigStr) {
+      try {
+        const llmConfig = JSON.parse(llmConfigStr)
+        if (llmConfig.platformConfigId) {
+          options.platform_config_id = llmConfig.platformConfigId
+        } else if (llmConfig.configId) {
+          options.config_id = llmConfig.configId
+        }
+      } catch (e) {
+        console.warn('解析 llm_config 失败:', e)
+      }
+    }
+    
+    const result = await autoExtractMemory(autoExtractInput.value.trim(), options)
     // 用提取结果填充表单并打开对话框
     formData.value = {
       title: result.title,

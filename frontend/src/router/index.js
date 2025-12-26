@@ -63,6 +63,12 @@ const routes = [
     component: () => import('@/views/AdminUsers.vue'),
     meta: { requiresAuth: true, requiresAdmin: true },
   },
+  {
+    path: '/admin/llm-configs',
+    name: 'AdminLLMConfigs',
+    component: () => import('@/views/AdminLLMConfigs.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true },
+  },
 ]
 
 const router = createRouter({
