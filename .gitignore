@@ -94,4 +94,5 @@ aaa.md
 # 生成的流程图文件
 backend/diagrams/*.drawio
 !backend/diagrams/.gitkeep
-
+# 数据库迁移文件
+backend\alembic
