@@ -4,6 +4,7 @@
 - 短期记忆：当前对话的上下文（由 context_manager 处理）
 """
 import uuid
+import json
 from datetime import datetime
 from sqlalchemy import Column, String, DateTime, Text, ForeignKey, Integer, Boolean
 from sqlalchemy.orm import relationship
@@ -31,6 +32,9 @@ class LongTermMemory(Base):
     category = Column(String(50), default="general")  # 分类：general, preference, fact, instruction
     priority = Column(Integer, default=0)  # 优先级，数字越大越重要
     
+    # Embedding 向量（JSON 存储，1024维）
+    embedding = Column(Text, nullable=True)  # JSON 格式存储向量
+    
     # 状态
     is_active = Column(Boolean, default=True, nullable=False)  # 是否启用
     
@@ -43,5 +47,23 @@ class LongTermMemory(Base):
         nullable=False
     )
     
+    def get_embedding_vector(self) -> list:
+        """获取 embedding 向量"""
+        if self.embedding:
+            try:
+                return json.loads(self.embedding)
+            except:
+                return []
+        return []
+    
+    def set_embedding_vector(self, vector: list):
+        """设置 embedding 向量"""
+        self.embedding = json.dumps(vector) if vector else None
+    
     def __repr__(self):
         return f"<LongTermMemory(id={self.id}, title={self.title}, user_id={self.user_id})>"
+    
+    @property
+    def has_embedding(self) -> bool:
+        """检查是否有 embedding"""
+        return bool(self.embedding)

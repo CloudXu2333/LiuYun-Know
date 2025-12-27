@@ -498,3 +498,54 @@ async def auto_extract_memory(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"AI提取失败: {str(e)}"
         )
+
+
+class UpdateEmbeddingsResponse(BaseModel):
+    """批量更新 embedding 响应"""
+    total: int
+    updated: int
+    failed: int
+    message: str
+
+
+@router.post("/update-embeddings", response_model=UpdateEmbeddingsResponse)
+async def update_all_embeddings(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    批量更新所有记忆的 embedding 向量
+    用于迁移旧数据或重新生成 embedding
+    """
+    from app.services.embedding_service import embedding_service
+    
+    # 获取用户所有记忆
+    memories, total = await memory_service.get_user_memories(
+        db=db,
+        user_id=current_user.id,
+        active_only=False,
+        limit=1000
+    )
+    
+    updated = 0
+    failed = 0
+    
+    for memory in memories:
+        try:
+            text = f"{memory.title} {memory.content}"
+            embedding = await embedding_service.get_embedding(text)
+            memory.set_embedding_vector(embedding)
+            updated += 1
+            print(f"[Memory] Updated embedding for: {memory.title}")
+        except Exception as e:
+            failed += 1
+            print(f"[Memory] Failed to update embedding for {memory.title}: {e}")
+    
+    await db.commit()
+    
+    return UpdateEmbeddingsResponse(
+        total=total,
+        updated=updated,
+        failed=failed,
+        message=f"成功更新 {updated} 条记忆的向量，失败 {failed} 条"
+    )

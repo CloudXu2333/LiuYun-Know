@@ -91,3 +91,35 @@ export const autoExtractMemory = async (content, options = {}) => {
   })
   return response.data
 }
+
+/**
+ * 创建记忆（带冲突检测）
+ * @param {Object} data - 记忆数据
+ * @param {string} data.title - 标题
+ * @param {string} data.content - 内容
+ * @param {string} data.category - 分类
+ * @param {number} data.priority - 优先级
+ * @param {boolean} data.is_active - 是否启用
+ * @param {boolean} data.auto_merge - 是否自动合并冲突
+ * @param {string} data.config_id - 用户配置 ID
+ * @param {string} data.platform_config_id - 平台配置 ID
+ * @returns {Promise<{memory: object, conflict: object, action_taken: string}>}
+ */
+export const createMemoryWithConflictCheck = async (data) => {
+  const response = await axios.post('/memory/create-with-conflict-check', data)
+  return response.data
+}
+
+/**
+ * 合并记忆
+ * @param {string} oldMemoryId - 旧记忆 ID
+ * @param {Object} mergedData - 合并后的数据
+ * @param {string} mergedData.title - 标题
+ * @param {string} mergedData.content - 内容
+ * @param {string} mergedData.category - 分类
+ * @param {number} mergedData.priority - 优先级
+ */
+export const mergeMemory = async (oldMemoryId, mergedData) => {
+  const response = await axios.post(`/memory/merge/${oldMemoryId}`, mergedData)
+  return response.data
+}

@@ -406,6 +406,77 @@
         </div>
       </div>
     </div>
+
+    <!-- 冲突检测对话框 -->
+    <div v-if="showConflictDialog" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-2xl w-full max-w-2xl shadow-xl max-h-[90vh] overflow-hidden flex flex-col">
+        <div class="p-6 border-b border-gray-200 flex-shrink-0">
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+              <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+              </svg>
+            </div>
+            <div>
+              <h2 class="text-lg font-semibold text-gray-900">检测到记忆冲突</h2>
+              <p class="text-sm text-gray-500">
+                冲突类型：<span class="font-medium text-amber-600">{{ getConflictTypeLabel(conflictInfo?.conflict_type) }}</span>
+              </p>
+            </div>
+          </div>
+        </div>
+        
+        <div class="p-6 space-y-4 overflow-y-auto flex-1">
+          <!-- 新记忆 -->
+          <div class="bg-blue-50 rounded-lg p-4">
+            <h4 class="text-sm font-medium text-blue-800 mb-2">📝 新记忆</h4>
+            <p class="text-sm font-medium text-blue-900">{{ pendingMemoryData?.title }}</p>
+            <p class="text-sm text-blue-700 mt-1">{{ pendingMemoryData?.content }}</p>
+          </div>
+          
+          <!-- 冲突的旧记忆 -->
+          <div class="bg-gray-50 rounded-lg p-4">
+            <h4 class="text-sm font-medium text-gray-700 mb-2">📋 现有记忆</h4>
+            <p class="text-sm text-gray-600">ID: {{ conflictInfo?.conflicting_memory_id }}</p>
+          </div>
+          
+          <!-- AI 建议的合并结果 -->
+          <div v-if="conflictInfo?.merged_content" class="bg-green-50 rounded-lg p-4">
+            <h4 class="text-sm font-medium text-green-800 mb-2">✨ AI 建议合并为</h4>
+            <p class="text-sm font-medium text-green-900">{{ conflictInfo.merged_content.title }}</p>
+            <p class="text-sm text-green-700 mt-1 whitespace-pre-wrap">{{ conflictInfo.merged_content.content }}</p>
+            <div class="flex items-center space-x-4 mt-2 text-xs text-green-600">
+              <span>分类: {{ getCategoryLabel(conflictInfo.merged_content.category) }}</span>
+              <span>优先级: {{ conflictInfo.merged_content.priority }}</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="p-6 border-t border-gray-200 flex justify-end space-x-3 flex-shrink-0">
+          <button
+            @click="cancelConflict"
+            class="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            取消
+          </button>
+          <button
+            @click="handleKeepBoth"
+            :disabled="saving"
+            class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+          >
+            保留两条
+          </button>
+          <button
+            v-if="conflictInfo?.merged_content"
+            @click="handleMergeConflict"
+            :disabled="saving"
+            class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+          >
+            {{ saving ? '合并中...' : '采用合并建议' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -420,7 +491,9 @@ import {
   updateMemory,
   deleteMemory,
   toggleMemory,
-  autoExtractMemory
+  autoExtractMemory,
+  createMemoryWithConflictCheck,
+  mergeMemory
 } from '@/api/memory'
 import { getMemorySettings, updateMemorySettings } from '@/api/user'
 
@@ -478,6 +551,11 @@ const formData = ref({
 // 删除确认
 const showDeleteConfirm = ref(false)
 const deletingMemory = ref(null)
+
+// 冲突检测
+const showConflictDialog = ref(false)
+const conflictInfo = ref(null)
+const pendingMemoryData = ref(null)
 
 // 加载记忆列表
 const loadMemories = async () => {
@@ -596,14 +674,47 @@ const saveMemory = async () => {
   saving.value = true
   try {
     if (editingMemory.value) {
+      // 编辑模式，直接更新
       await updateMemory(editingMemory.value.id, formData.value)
       ElMessage.success('记忆已更新')
+      closeDialog()
+      loadMemories()
     } else {
-      await createMemory(formData.value)
-      ElMessage.success('记忆已添加')
+      // 新建模式，使用冲突检测
+      const llmConfigStr = localStorage.getItem('llm_config')
+      const requestData = {
+        ...formData.value,
+        auto_merge: false  // 不自动合并，让用户决定
+      }
+      
+      if (llmConfigStr) {
+        try {
+          const llmConfig = JSON.parse(llmConfigStr)
+          if (llmConfig.platformConfigId) {
+            requestData.platform_config_id = llmConfig.platformConfigId
+          } else if (llmConfig.configId) {
+            requestData.config_id = llmConfig.configId
+          }
+        } catch (e) {
+          console.warn('解析 llm_config 失败:', e)
+        }
+      }
+      
+      const result = await createMemoryWithConflictCheck(requestData)
+      
+      if (result.action_taken === 'conflict_detected' && result.conflict) {
+        // 检测到冲突，显示冲突对话框
+        conflictInfo.value = result.conflict
+        pendingMemoryData.value = formData.value
+        showConflictDialog.value = true
+        showDialog.value = false
+      } else {
+        // 无冲突或已自动处理
+        ElMessage.success('记忆已添加')
+        closeDialog()
+        loadMemories()
+      }
     }
-    closeDialog()
-    loadMemories()
   } catch (error) {
     console.error('保存失败:', error)
     ElMessage.error('保存失败')
@@ -715,6 +826,65 @@ const saveSettings = async () => {
 watch([filterCategory, showInactiveOnly], () => {
   loadMemories()
 })
+
+// 处理冲突：合并
+const handleMergeConflict = async () => {
+  if (!conflictInfo.value?.merged_content || !conflictInfo.value?.conflicting_memory_id) {
+    ElMessage.error('合并数据不完整')
+    return
+  }
+  
+  saving.value = true
+  try {
+    await mergeMemory(conflictInfo.value.conflicting_memory_id, conflictInfo.value.merged_content)
+    ElMessage.success('记忆已合并')
+    showConflictDialog.value = false
+    conflictInfo.value = null
+    pendingMemoryData.value = null
+    loadMemories()
+  } catch (error) {
+    console.error('合并失败:', error)
+    ElMessage.error('合并失败')
+  } finally {
+    saving.value = false
+  }
+}
+
+// 处理冲突：保留两条
+const handleKeepBoth = async () => {
+  saving.value = true
+  try {
+    await createMemory(pendingMemoryData.value)
+    ElMessage.success('已保留两条记忆')
+    showConflictDialog.value = false
+    conflictInfo.value = null
+    pendingMemoryData.value = null
+    loadMemories()
+  } catch (error) {
+    console.error('创建失败:', error)
+    ElMessage.error('创建失败')
+  } finally {
+    saving.value = false
+  }
+}
+
+// 取消冲突处理
+const cancelConflict = () => {
+  showConflictDialog.value = false
+  conflictInfo.value = null
+  pendingMemoryData.value = null
+}
+
+// 获取冲突类型标签
+const getConflictTypeLabel = (type) => {
+  const labels = {
+    'duplicate': '重复',
+    'update': '更新/补充',
+    'contradiction': '矛盾',
+    'none': '无冲突'
+  }
+  return labels[type] || type
+}
 
 // 打开设置对话框时，同步表单数据
 watch(showSettingsDialog, (val) => {

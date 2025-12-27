@@ -2,12 +2,14 @@
 记忆服务 - 长期记忆的增删查改（异步版本）
 支持核心记忆（高优先级）必定加载 + 普通记忆向量检索
 支持冲突检测和自动合并
+使用千问 Embedding 模型进行向量相似度匹配
 """
 from typing import List, Optional, Tuple, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, and_, func
 from app.models.memory import LongTermMemory
 from app.schemas.memory import LongTermMemoryCreate, LongTermMemoryUpdate
+from app.services.embedding_service import embedding_service
 
 
 class MemoryService:
@@ -85,6 +87,7 @@ class MemoryService:
     ) -> Tuple[List[LongTermMemory], List[LongTermMemory]]:
         """
         获取用于上下文的记忆：核心记忆 + 相关普通记忆
+        使用向量相似度检索普通记忆
         
         Args:
             db: 数据库会话
@@ -102,15 +105,80 @@ class MemoryService:
         # 2. 获取普通记忆
         normal_memories = await self.get_normal_memories(db, user_id, threshold)
         
-        # 3. 如果有查询文本，进行向量相似度检索；否则按优先级取 top_k
+        # 3. 如果有查询文本，进行向量相似度检索
         if query_text and normal_memories:
-            # TODO: 实现向量检索
-            # 目前先按优先级排序取 top_k
-            selected_normal = normal_memories[:top_k]
+            selected_normal = await self._vector_search_memories(
+                query_text, normal_memories, top_k
+            )
         else:
+            # 没有查询文本，按优先级取 top_k
             selected_normal = normal_memories[:top_k]
         
         return core_memories, selected_normal
+    
+    async def _vector_search_memories(
+        self,
+        query_text: str,
+        memories: List[LongTermMemory],
+        top_k: int = 5,
+        min_similarity: float = 0.3
+    ) -> List[LongTermMemory]:
+        """
+        使用向量相似度检索记忆
+        
+        Args:
+            query_text: 查询文本
+            memories: 候选记忆列表
+            top_k: 返回数量
+            min_similarity: 最小相似度阈值
+            
+        Returns:
+            相似度最高的记忆列表
+        """
+        if not memories:
+            return []
+        
+        print(f"[Memory] Vector search: query='{query_text[:50]}...', candidates={len(memories)}")
+        
+        # 获取查询文本的 embedding
+        query_embedding = await embedding_service.get_embedding(query_text)
+        
+        # 收集所有记忆的 embedding
+        scored_memories = []
+        memories_need_embedding = []
+        
+        for memory in memories:
+            memory_embedding = memory.get_embedding_vector()
+            if memory_embedding:
+                # 已有 embedding，直接计算相似度
+                similarity = embedding_service.cosine_similarity(query_embedding, memory_embedding)
+                scored_memories.append((memory, similarity))
+                print(f"[Memory] '{memory.title}' similarity: {similarity:.3f} (cached)")
+            else:
+                # 需要生成 embedding
+                memories_need_embedding.append(memory)
+        
+        # 批量生成缺失的 embedding
+        if memories_need_embedding:
+            print(f"[Memory] Generating embeddings for {len(memories_need_embedding)} memories...")
+            texts = [f"{m.title} {m.content}" for m in memories_need_embedding]
+            embeddings = await embedding_service.get_embeddings(texts)
+            
+            for memory, emb in zip(memories_need_embedding, embeddings):
+                # 保存 embedding 到数据库（下次可复用）
+                memory.set_embedding_vector(emb)
+                similarity = embedding_service.cosine_similarity(query_embedding, emb)
+                scored_memories.append((memory, similarity))
+                print(f"[Memory] '{memory.title}' similarity: {similarity:.3f} (new)")
+        
+        # 按相似度降序排序
+        scored_memories.sort(key=lambda x: x[1], reverse=True)
+        
+        # 过滤低相似度，取 top_k
+        result = [m for m, score in scored_memories[:top_k] if score >= min_similarity]
+        print(f"[Memory] Vector search result: {len(result)} memories (min_sim={min_similarity})")
+        
+        return result
     
     async def get_user_memories(
         self,
@@ -205,7 +273,7 @@ class MemoryService:
         user_id: str,
         memory_data: LongTermMemoryCreate
     ) -> LongTermMemory:
-        """创建长期记忆"""
+        """创建长期记忆（同时生成 embedding）"""
         memory = LongTermMemory(
             user_id=user_id,
             title=memory_data.title,
@@ -214,6 +282,16 @@ class MemoryService:
             priority=memory_data.priority,
             is_active=memory_data.is_active
         )
+        
+        # 生成 embedding
+        try:
+            text = f"{memory_data.title} {memory_data.content}"
+            embedding = await embedding_service.get_embedding(text)
+            memory.set_embedding_vector(embedding)
+            print(f"[Memory] Generated embedding for new memory: {memory_data.title}")
+        except Exception as e:
+            print(f"[Memory] Failed to generate embedding: {e}")
+        
         db.add(memory)
         await db.flush()
         await db.refresh(memory)
@@ -226,14 +304,28 @@ class MemoryService:
         user_id: str,
         memory_data: LongTermMemoryUpdate
     ) -> Optional[LongTermMemory]:
-        """更新长期记忆"""
+        """更新长期记忆（内容变化时重新生成 embedding）"""
         memory = await self.get_memory_by_id(db, memory_id, user_id)
         if not memory:
             return None
         
         update_data = memory_data.model_dump(exclude_unset=True)
+        
+        # 检查是否需要更新 embedding（标题或内容变化）
+        need_update_embedding = 'title' in update_data or 'content' in update_data
+        
         for field, value in update_data.items():
             setattr(memory, field, value)
+        
+        # 重新生成 embedding
+        if need_update_embedding:
+            try:
+                text = f"{memory.title} {memory.content}"
+                embedding = await embedding_service.get_embedding(text)
+                memory.set_embedding_vector(embedding)
+                print(f"[Memory] Updated embedding for memory: {memory.title}")
+            except Exception as e:
+                print(f"[Memory] Failed to update embedding: {e}")
         
         await db.flush()
         await db.refresh(memory)
@@ -339,9 +431,26 @@ class MemoryService:
             "message": message
         }
     
+    async def _calculate_vector_similarity(self, text1: str, text2: str) -> float:
+        """
+        计算两段文本的向量相似度（使用千问 Embedding）
+        返回 0-1 之间的相似度分数
+        """
+        if not text1 or not text2:
+            return 0.0
+        
+        try:
+            embeddings = await embedding_service.get_embeddings([text1, text2])
+            if len(embeddings) == 2:
+                return embedding_service.cosine_similarity(embeddings[0], embeddings[1])
+        except Exception as e:
+            print(f"[Memory] Vector similarity failed: {e}")
+        
+        return 0.0
+    
     def _calculate_text_similarity(self, text1: str, text2: str) -> float:
         """
-        计算两段文本的简单相似度（基于词汇重叠）
+        计算两段文本的简单相似度（基于词汇重叠）- 同步版本，作为备用
         返回 0-1 之间的相似度分数
         """
         # 简单的字符级别相似度
@@ -370,7 +479,7 @@ class MemoryService:
         """
         获取用于冲突检测的记忆：
         1. 优先级 >= threshold 的核心记忆：全部参与
-        2. 优先级 < threshold 的普通记忆：取相似度最高的 top_k 条
+        2. 优先级 < threshold 的普通记忆：使用向量相似度取 top_k 条
         
         Args:
             db: 数据库会话
@@ -391,26 +500,20 @@ class MemoryService:
         normal_memories = await self.get_normal_memories(db, user_id, threshold)
         print(f"[Memory] Normal memories (priority < {threshold}): {len(normal_memories)}")
         
-        # 3. 对普通记忆按相似度排序，取 top_k
+        # 3. 对普通记忆使用向量相似度排序，取 top_k
         new_text = f"{new_title} {new_content}"
         print(f"[Memory] New memory text: {new_text[:100]}...")
         
         selected_normal = []
         if normal_memories:
-            # 计算每条普通记忆与新记忆的相似度
-            scored_memories = []
-            for m in normal_memories:
-                memory_text = f"{m.title} {m.content}"
-                similarity = self._calculate_text_similarity(new_text, memory_text)
-                scored_memories.append((m, similarity))
-                print(f"[Memory] Similarity with '{m.title}': {similarity:.3f}")
-            
-            # 按相似度降序排序
-            scored_memories.sort(key=lambda x: x[1], reverse=True)
-            
-            # 取相似度 > 0.1 的前 top_k 条（过滤掉完全不相关的）
-            selected_normal = [m for m, score in scored_memories[:top_k] if score > 0.1]
-            print(f"[Memory] Selected normal memories (similarity > 0.1): {len(selected_normal)}")
+            # 使用向量相似度检索
+            selected_normal = await self._vector_search_memories(
+                new_text, 
+                normal_memories, 
+                top_k=top_k,
+                min_similarity=0.3  # 冲突检测用较低阈值
+            )
+            print(f"[Memory] Selected normal memories by vector similarity: {len(selected_normal)}")
             for m in selected_normal:
                 print(f"[Memory]   - {m.title}")
         
@@ -566,7 +669,7 @@ class MemoryService:
         merged_data: Dict[str, Any]
     ) -> Optional[LongTermMemory]:
         """
-        合并记忆：更新旧记忆为合并后的内容
+        合并记忆：更新旧记忆为合并后的内容（同时更新 embedding）
         
         Args:
             db: 数据库会话
@@ -590,6 +693,15 @@ class MemoryService:
         old_priority = memory.priority
         new_priority = merged_data.get("priority", old_priority)
         memory.priority = (old_priority + new_priority) // 2
+        
+        # 重新生成 embedding
+        try:
+            text = f"{memory.title} {memory.content}"
+            embedding = await embedding_service.get_embedding(text)
+            memory.set_embedding_vector(embedding)
+            print(f"[Memory] Updated embedding for merged memory: {memory.title}")
+        except Exception as e:
+            print(f"[Memory] Failed to update embedding: {e}")
         
         await db.flush()
         await db.refresh(memory)
