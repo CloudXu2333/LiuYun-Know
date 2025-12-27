@@ -39,7 +39,8 @@ tiktoken>=0.5.0
 # Neo4j
 neo4j==5.16.0
 
-## Paddle（默认只装 Paddle；如需 OCR 请安装 backend/requirements-ocr.txt）
+# Paddle OCR（Windows 建议 Python 3.10/3.11）
+# 说明：paddleocr 依赖 PyMuPDF<1.21.0，在 Python 3.12 + Windows 下可能构建失败
 paddlepaddle==2.6.2
 paddleocr==2.7.0.3
 PyMuPDF<1.21.0
