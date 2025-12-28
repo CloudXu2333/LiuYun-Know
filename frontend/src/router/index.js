@@ -69,6 +69,12 @@ const routes = [
     component: () => import('@/views/AdminLLMConfigs.vue'),
     meta: { requiresAuth: true, requiresAdmin: true },
   },
+  {
+    path: '/mcp-tools',
+    name: 'MCPTools',
+    component: () => import('@/views/MCPTools.vue'),
+    meta: { requiresAuth: true },
+  },
 ]
 
 const router = createRouter({

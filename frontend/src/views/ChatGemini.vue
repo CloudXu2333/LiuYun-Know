@@ -100,6 +100,13 @@
                     模型配置
                   </button>
                   <button
+                    @click="router.push('/mcp-tools')"
+                    class="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center"
+                  >
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+                    MCP 工具
+                  </button>
+                  <button
                     @click="handleLogout"
                     class="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center"
                   >
@@ -688,6 +695,9 @@
                   </transition>
                 </div>
 
+                <!-- MCP 工具选择器 -->
+                <MCPToolSelector v-model="selectedMCPTools" />
+
                 <!-- 文本输入 -->
                 <textarea
                   ref="inputTextarea"
@@ -917,6 +927,7 @@ import { autoExtractMemory, createMemory } from '@/api/memory'
 import { renderMarkdown } from '@/utils/markdown'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import ModelSelector from '@/components/chat/ModelSelector.vue'
+import MCPToolSelector from '@/components/chat/MCPToolSelector.vue'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import 'dayjs/locale/zh-cn'
@@ -956,6 +967,7 @@ const enableWebSearch = ref(false)
 const isSearching = ref(false)
 const showWebSearchSettings = ref(false)
 const webSearchDropdownRef = ref(null)
+const selectedMCPTools = ref([])  // 选中的 MCP 工具 ID 列表
 const copiedMessageIndex = ref(null)
 const messagesTotal = ref(0)  // 消息总数
 const messagesHasMore = ref(false)  // 是否有更多历史消息
@@ -1164,6 +1176,7 @@ const handleStreamMode = async (userMessage) => {
     sources: [],
     webSources: [],
     memorySources: [],
+    mcpToolResults: [],  // MCP 工具调用结果
     thinking: false,
     thinkingSteps: []
   })
@@ -1187,10 +1200,12 @@ const handleStreamMode = async (userMessage) => {
     // 开始生成回答
     currentThinking.value = '生成回答中'
     
+    // 统一使用一个接口，支持联网搜索、知识库、MCP 工具
     await sendMessageStreamWithAbort(
       {
         message: finalMessage,
         conversation_id: conversationId,
+        mcp_tool_ids: selectedMCPTools.value
       },
       abortController.signal,
       (content, newConversationId, webSources, kbSources, memorySources) => {
@@ -1227,8 +1242,8 @@ const handleStreamMode = async (userMessage) => {
           scrollToBottom()
         }
       },
-      (kbSources) => {
-        console.log('Stream completed, kb sources:', kbSources)
+      (kbSources, toolResults) => {
+        console.log('Stream completed, kb sources:', kbSources, 'tool results:', toolResults)
         // 保存知识库来源（仅当还没有设置时，作为备用）
         if (kbSources && (kbSources.chunks?.length > 0 || kbSources.graph_data) && !messages.value[messageIndex].sources) {
           messages.value[messageIndex].sources = kbSources
@@ -1253,7 +1268,8 @@ const handleStreamMode = async (userMessage) => {
         abortController = null
         currentThinking.value = ''
         currentThinkingSteps.value = []
-      }
+      },
+      messageIndex
     )
   } catch (e) {
     loading.value = false
@@ -1274,7 +1290,7 @@ const addThinkingStep = (step) => {
 }
 
 // 支持中断的流式请求
-const sendMessageStreamWithAbort = async (data, signal, onMessage, onDone, onError) => {
+const sendMessageStreamWithAbort = async (data, signal, onMessage, onDone, onError, messageIndex = null) => {
   try {
     // 使用新的 LLM API，支持模型切换
     const requestData = {
@@ -1296,7 +1312,10 @@ const sendMessageStreamWithAbort = async (data, signal, onMessage, onDone, onErr
         use_tavily: webSearchConfig.value.use_tavily,
         use_firecrawl: webSearchConfig.value.use_firecrawl,
         firecrawl_scrape_content: webSearchConfig.value.firecrawl_scrape_content
-      } : null
+      } : null,
+      // MCP 工具配置
+      mcp_tool_ids: data.mcp_tool_ids || [],
+      max_mcp_iterations: 10
     }
     
     // 调试日志
@@ -1309,7 +1328,8 @@ const sendMessageStreamWithAbort = async (data, signal, onMessage, onDone, onErr
       platformConfigId: requestData.platform_config_id,
       maxContextTokens: requestData.max_context_tokens,
       knowledge_base_id: requestData.knowledge_base_id,
-      enable_web_search: requestData.enable_web_search
+      enable_web_search: requestData.enable_web_search,
+      mcp_tool_ids: requestData.mcp_tool_ids
     })
     console.log('[Web Search] enableWebSearch.value =', enableWebSearch.value)
     console.log('[Knowledge Base] selectedKnowledgeBase =', selectedKnowledgeBase.value)
@@ -1402,6 +1422,25 @@ const sendMessageStreamWithAbort = async (data, signal, onMessage, onDone, onErr
             console.log('[Stream] Search error:', parsed.error)
             isSearching.value = false
             console.warn('Web search error:', parsed.error)
+          } else if (parsed.type === 'mcp_tools_loaded') {
+            // MCP 工具加载完成
+            console.log('[Stream] MCP tools loaded:', parsed.tools)
+          } else if (parsed.type === 'tool_call_start') {
+            // MCP 工具调用开始
+            console.log('[Stream] Tool call start:', parsed.tool_name)
+            addThinkingStep(`🔧 调用工具: ${parsed.tool_name}`)
+          } else if (parsed.type === 'tool_call_result') {
+            // MCP 工具调用结果
+            console.log('[Stream] Tool call result:', parsed.tool_name, parsed.result)
+            if (messageIndex !== null && messages.value[messageIndex]) {
+              if (!messages.value[messageIndex].mcpToolResults) {
+                messages.value[messageIndex].mcpToolResults = []
+              }
+              messages.value[messageIndex].mcpToolResults.push({
+                tool_name: parsed.tool_name,
+                result: parsed.result
+              })
+            }
           } else if (parsed.type === 'content') {
             // 内容事件
             onMessage?.(parsed.content)
@@ -1409,7 +1448,7 @@ const sendMessageStreamWithAbort = async (data, signal, onMessage, onDone, onErr
             // 完成事件
             console.log('[Stream] Done', parsed)
             // 传递知识库来源信息
-            onDone?.(parsed.sources || [])
+            onDone?.(parsed.sources || [], parsed.tool_results || [])
           } else if (parsed.type === 'error') {
             console.log('[Stream] Error event:', parsed.error)
             onError?.(parsed.error)
