@@ -6,7 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import json
 import traceback
 
@@ -186,6 +186,7 @@ async def chat_with_model_stream(
             
             # 使用 LangGraph Agent 流式处理
             full_response = ""
+            tool_results = []  # MCP 工具调用结果
             
             async for event in conversation_agent.run_stream(
                 user_query=request.message,
@@ -198,10 +199,12 @@ async def chat_with_model_stream(
                 base_url=base_url,
                 system_prompt="你是一个有帮助的AI助手。请用中文回答问题。",
                 max_context_tokens=max_context_tokens,
-                db=db,  # 传入数据库会话
-                user_id=current_user.id,  # 传入用户 ID
-                memory_top_k=current_user.memory_top_k,  # 用户配置的普通记忆检索数量
-                core_memory_threshold=current_user.core_memory_threshold  # 用户配置的核心记忆阈值
+                db=db,
+                user_id=current_user.id,
+                memory_top_k=current_user.memory_top_k,
+                core_memory_threshold=current_user.core_memory_threshold,
+                mcp_tool_ids=request.mcp_tool_ids,
+                max_mcp_iterations=request.max_mcp_iterations
             ):
                 event_type = event.get("type")
                 
@@ -233,6 +236,22 @@ async def chat_with_model_stream(
                     # 发送上下文信息给前端
                     yield f"data: {json.dumps({'type': 'context_info', 'info': event.get('info', {})})}\n\n"
                 
+                elif event_type == "mcp_tools_loaded":
+                    # MCP 工具加载完成
+                    yield f"data: {json.dumps({'type': 'mcp_tools_loaded', 'tools': event.get('tools', [])})}\n\n"
+                
+                elif event_type == "tool_call_start":
+                    # MCP 工具调用开始
+                    yield f"data: {json.dumps({'type': 'tool_call_start', 'tool_name': event.get('tool_name'), 'arguments': event.get('arguments', {})})}\n\n"
+                
+                elif event_type == "tool_call_result":
+                    # MCP 工具调用结果
+                    tool_results.append({
+                        "tool_name": event.get("tool_name"),
+                        "result": event.get("result")
+                    })
+                    yield f"data: {json.dumps({'type': 'tool_call_result', 'tool_name': event.get('tool_name'), 'result': event.get('result')})}\n\n"
+                
                 elif event_type == "content":
                     chunk = event.get("content", "")
                     full_response += chunk
@@ -252,6 +271,8 @@ async def chat_with_model_stream(
                         msg_metadata['thinking_steps'] = thinking_steps
                     if memory_sources:
                         msg_metadata['memory_sources'] = memory_sources
+                    if tool_results:
+                        msg_metadata['tool_results'] = tool_results
                     
                     assistant_msg = await ChatService.create_message(
                         db=db,
@@ -266,6 +287,8 @@ async def chat_with_model_stream(
                     done_data = {'type': 'done', 'model': model}
                     if kb_sources:
                         done_data['sources'] = kb_sources
+                    if tool_results:
+                        done_data['tool_results'] = tool_results
                     yield f"data: {json.dumps(done_data)}\n\n"
                     yield "data: [DONE]\n\n"
             
@@ -595,3 +618,5 @@ async def test_platform_config_by_id(
             "message": f"连接失败: {str(e)}",
             "model": config.model
         }
+
+

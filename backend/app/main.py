@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from app.config import settings
 from app.core.database import init_db, close_db
 from app.core.redis_client import redis_client
-from app.api import auth, users, chat, knowledge_base, llm_config, memory, diagram
+from app.api import auth, users, chat, knowledge_base, llm_config, memory, diagram, mcp_tool
 
 
 @asynccontextmanager
@@ -113,6 +113,7 @@ app.include_router(knowledge_base.router, prefix=settings.api_prefix)
 app.include_router(llm_config.router, prefix=settings.api_prefix)
 app.include_router(memory.router, prefix=settings.api_prefix)
 app.include_router(diagram.router, prefix=settings.api_prefix)
+app.include_router(mcp_tool.router, prefix=settings.api_prefix)
 
 
 @app.get("/")

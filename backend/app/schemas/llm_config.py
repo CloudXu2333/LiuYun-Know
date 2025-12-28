@@ -68,6 +68,9 @@ class ChatWithModelRequest(BaseModel):
     web_search_config: Optional[WebSearchConfig] = Field(None, description="联网搜索自定义配置")
     # 上下文配置
     max_context_tokens: int = Field(default=65536, ge=1000, description="最大上下文 token 数，超过时自动压缩旧消息")
+    # MCP 工具配置
+    mcp_tool_ids: List[str] = Field(default_factory=list, description="启用的 MCP 工具 ID 列表")
+    max_mcp_iterations: int = Field(default=10, ge=1, le=20, description="最大 MCP 工具调用迭代次数")
 
 
 class UserLLMConfigCreate(BaseModel):

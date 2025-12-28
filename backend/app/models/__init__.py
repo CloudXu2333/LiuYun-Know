@@ -4,6 +4,7 @@ from app.models.conversation import Conversation, Message, MessageRole
 from app.models.knowledge_base import KnowledgeBase, KnowledgeFile
 from app.models.llm_config import UserLLMConfig
 from app.models.memory import LongTermMemory
+from app.models.mcp_tool import MCPTool, MCPToolType
 
 __all__ = [
     "User", 
@@ -13,5 +14,7 @@ __all__ = [
     "KnowledgeBase", 
     "KnowledgeFile", 
     "UserLLMConfig",
-    "LongTermMemory"
+    "LongTermMemory",
+    "MCPTool",
+    "MCPToolType"
 ]
