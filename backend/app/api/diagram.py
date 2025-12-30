@@ -1,11 +1,10 @@
 """
-流程图生成 API - 基于真正的 MCP 协议的 AI 流程图生成
+流程图生成 API - AI 流程图生成
 
-MCP (Model Context Protocol) 调用流程：
+调用流程：
 1. LLM 分析用户需求，决定调用 create_diagram 工具
-2. 后端作为 MCP Client，通过 stdio 与 MCP Server 通信
-3. MCP Server 执行工具，返回 Draw.io XML
-4. 前端渲染流程图
+2. 后端直接调用 DiagramService 生成 Draw.io XML
+3. 前端渲染流程图
 """
 import json
 from typing import Optional, List, Dict, Any
@@ -18,7 +17,7 @@ from app.core.database import get_db
 from app.dependencies import get_current_user
 from app.models.user import User
 from app.ai.llm_manager import llm_manager
-from app.services.mcp_diagram_service import mcp_diagram_service
+from app.services.diagram_service import diagram_service
 
 router = APIRouter(prefix="/diagram", tags=["流程图"])
 
@@ -134,8 +133,8 @@ async def generate_diagram_stream(
             # Step 2: AI 思考并决定是否调用工具
             yield f"data: {json.dumps({'type': 'step', 'step': 2, 'title': 'AI 分析', 'content': '正在设计流程图结构...'})}\n\n"
             
-            # 获取 MCP 工具定义
-            tools = mcp_diagram_service.get_tools()
+            # 获取工具定义
+            tools = diagram_service.get_tools()
             
             # 确定使用的 API 配置
             from app.config import settings
@@ -190,7 +189,7 @@ async def generate_diagram_stream(
             if assistant_message.tool_calls:
                 for tool_call in assistant_message.tool_calls:
                     if tool_call.function.name == "create_diagram":
-                        yield f"data: {json.dumps({'type': 'step', 'step': 3, 'title': 'MCP 工具调用', 'content': 'LLM 决定调用 create_diagram 工具...'})}\n\n"
+                        yield f"data: {json.dumps({'type': 'step', 'step': 3, 'title': '工具调用', 'content': 'LLM 决定调用 create_diagram 工具...'})}\n\n"
                         
                         # 解析参数
                         try:
@@ -214,14 +213,10 @@ async def generate_diagram_stream(
                                 edge_info += f" ({label})"
                             yield f"data: {json.dumps({'type': 'edge', 'info': edge_info})}\n\n"
                         
-                        # 真正的 MCP 调用
-                        yield f"data: {json.dumps({'type': 'step', 'step': 4, 'title': 'MCP Server 通信', 'content': '通过 JSON-RPC 调用 MCP Server...'})}\n\n"
+                        # 调用流程图服务
+                        yield f"data: {json.dumps({'type': 'step', 'step': 4, 'title': '生成流程图', 'content': '正在生成 Draw.io XML...'})}\n\n"
                         
-                        # 这里是真正的 MCP 调用：
-                        # 1. MCPClient 启动 drawio_mcp_server.py 子进程
-                        # 2. 通过 stdin 发送 JSON-RPC 请求
-                        # 3. 通过 stdout 接收响应
-                        result = await mcp_diagram_service.call_tool(
+                        result = diagram_service.call_tool(
                             "create_diagram",
                             arguments
                         )
@@ -260,11 +255,11 @@ async def call_create_diagram_tool(
     current_user: User = Depends(get_current_user)
 ):
     """
-    直接调用 create_diagram MCP 工具
+    直接调用 create_diagram 工具
     
     用于前端直接调用工具（不经过 AI）
     """
-    result = await mcp_diagram_service.call_tool("create_diagram", data)
+    result = diagram_service.call_tool("create_diagram", data)
     if not result.get("success"):
         raise HTTPException(status_code=400, detail=result.get("error", "生成失败"))
     return result
@@ -276,10 +271,8 @@ async def list_diagram_tools(
 ):
     """
     获取可用的流程图工具列表
-    
-    返回 MCP 工具定义，供前端展示或调试
     """
     return {
-        "tools": mcp_diagram_service.get_tools(),
+        "tools": diagram_service.get_tools(),
         "description": "流程图生成工具，支持通过 AI 对话或直接调用"
     }

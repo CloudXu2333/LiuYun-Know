@@ -62,11 +62,19 @@ pip install -r requirements.txt
 
 # 配置环境变量
 copy .env.example .env
-# 编辑 .env 填入 API Key 等配置
+# 编辑 .env 填入必要配置
+
+# 初始化数据库（首次运行）
+python init_db.py
 
 # 启动服务
 python -m uvicorn app.main:app --reload --port 8000
 ```
+
+首次运行 `init_db.py` 会创建数据库表并生成默认管理员账号：
+- 用户名：`admin`
+- 密码：`admin`
+- ⚠️ 请登录后立即修改密码！
 
 ### 前端安装
 
@@ -82,25 +90,93 @@ npm run dev
 
 访问 http://localhost:5173
 
-## ⚙️ 配置说明
+## ⚙️ 环境变量配置
+
+在 `backend/.env` 中配置环境变量。复制 `.env.example` 并修改：
+
+```bash
+copy .env.example .env
+```
 
 ### 必需配置
 
-| 配置项 | 说明 |
-|--------|------|
-| `SECRET_KEY` | JWT 密钥 |
-| `DATABASE_URL` | 数据库连接 |
-| `OPENAI_API_KEY` | LLM API Key |
-| `QWEN_API_KEY` | Embedding 模型 Key |
+```bash
+# 安全密钥（必须修改）
+SECRET_KEY=your-secret-key-here-change-in-production
 
-### 可选配置
+# 数据库
+DATABASE_URL=sqlite+aiosqlite:///./data/sqlite/liuyun_know.db
 
-| 配置项 | 说明 |
-|--------|------|
-| `DEEPSEEK_API_KEY` | DeepSeek API（国内推荐） |
-| `TAVILY_API_KEY` | 联网搜索 |
-| `FIRECRAWL_API_KEY` | 网页抓取 |
-| `NEO4J_*` | 知识图谱存储 |
+# Embedding 模型（知识库必需）
+QWEN_API_KEY=sk-your-dashscope-api-key
+QWEN_API_BASE=https://dashscope.aliyuncs.com/compatible-mode/v1
+EMBEDDING_MODEL=text-embedding-v4
+```
+
+### 对话模型配置
+
+> **注意**：对话模型的 API Key 可以在前端界面配置，支持用户级和平台级两种方式，无需在 `.env` 中配置。
+
+如需使用 DeepSeek 作为默认模型（可选）：
+
+```bash
+DEEPSEEK_API_KEY=sk-your-deepseek-api-key
+DEEPSEEK_API_BASE=https://api.deepseek.com
+```
+
+### 基础服务配置
+
+```bash
+# Redis（缓存和消息队列）
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_DB=0
+REDIS_PASSWORD=
+
+# Celery 异步任务
+CELERY_BROKER_URL=redis://localhost:6379/1
+CELERY_RESULT_BACKEND=redis://localhost:6379/2
+
+# Neo4j 知识图谱
+NEO4J_URI=bolt://localhost:7687
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=your_neo4j_password
+
+# MinIO 对象存储
+MINIO_ENDPOINT=localhost:9091
+MINIO_ACCESS_KEY=minioadmin
+MINIO_SECRET_KEY=minioadmin
+MINIO_BUCKET_NAME=liuyun-know
+
+# PaddleOCR 文档解析（可选）
+PADDLEOCR_API_URL=https://xbmbgatds3k3k5d5.aistudio-app.com/layout-parsing
+PADDLEOCR_TOKEN=your_paddleocr_token
+```
+
+### 可选服务配置
+
+```bash
+
+# 联网搜索（可选）
+TAVILY_API_KEY=your-tavily-api-key
+FIRECRAWL_API_KEY=your-firecrawl-api-key
+
+# CORS
+CORS_ORIGINS=http://localhost:5173,http://localhost:3000
+```
+
+### 模型配置说明
+
+系统支持两种方式配置对话模型：
+
+1. **平台级配置**（管理员）：在管理后台添加，所有用户可用
+2. **用户级配置**：用户在前端自行添加自己的 API Key
+
+支持的模型提供商：
+- DeepSeek（国内推荐）
+- 302.AI（支持 Claude/GPT/Gemini）
+- OpenAI
+- 其他 OpenAI 兼容 API
 
 ## 📁 项目结构
 
@@ -163,6 +239,13 @@ npm run dev
   "env": {}
 }
 ```
+
+## � 致谢
+
+本项目参考了以下优秀开源项目：
+
+- [LightRAG](https://github.com/HKUDS/LightRAG) - 知识库 RAG 核心实现，知识图谱 + 向量检索混合方案，环境配置请参考该项目文档
+- [Yuxi-Know](https://github.com/xerrors/Yuxi-Know)
 
 ## 📝 License
 
