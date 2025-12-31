@@ -261,7 +261,7 @@ class KnowledgeBaseService:
         await db.commit()
         await db.refresh(file_record)
         
-        # 提交 Celery 任务
+        # 提交 Celery 任务（Redis 锁确保同一知识库串行执行）
         task = process_file_task.delay(file_record.id)
         file_record.task_id = task.id
         await db.commit()

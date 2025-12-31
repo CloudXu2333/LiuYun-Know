@@ -1,10 +1,16 @@
 """
 Celery 文件处理任务
+
+支持多 worker 模式：
+- 每个知识库使用独立队列 (kb_{id})
+- 同一知识库的任务串行执行
+- 不同知识库的任务可并行执行
 """
 import os
 import tempfile
 import asyncio
 import numpy as np
+import redis
 from datetime import datetime
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker, Session
@@ -23,6 +29,15 @@ from app.config import settings
 sync_database_url = settings.database_url.replace("sqlite+aiosqlite://", "sqlite://")
 sync_engine = create_engine(sync_database_url, connect_args={"check_same_thread": False})
 SyncSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=sync_engine)
+
+# Redis 客户端（用于分布式锁）
+redis_client = redis.Redis(
+    host=settings.redis_host,
+    port=settings.redis_port,
+    db=settings.redis_db,
+    password=settings.redis_password or None,
+    decode_responses=True
+)
 
 
 def _get_workspace_label(working_dir: str) -> str:
@@ -356,11 +371,40 @@ def process_file_task(self, file_id: int):
     """
     处理上传的文件
     
+    使用 Redis 分布式锁确保同一知识库的任务串行执行
+    
     Args:
         file_id: 文件 ID
     """
-    # 使用同步方式处理
-    return _process_file_sync(file_id)
+    db: Session = SyncSessionLocal()
+    try:
+        # 获取文件记录以确定知识库 ID
+        file_record = db.query(KnowledgeFile).filter(KnowledgeFile.id == file_id).first()
+        if not file_record:
+            raise ValueError(f"文件记录不存在: {file_id}")
+        
+        kb_id = file_record.knowledge_base_id
+        lock_key = f"kb_processing_lock:{kb_id}"
+        
+        # 尝试获取锁（最多等待 30 分钟，锁超时 1 小时）
+        lock = redis_client.lock(lock_key, timeout=3600, blocking_timeout=1800)
+        
+        if lock.acquire(blocking=True):
+            try:
+                print(f"🔒 获取知识库 {kb_id} 的处理锁，开始处理文件 {file_id}")
+                return _process_file_sync(file_id)
+            finally:
+                try:
+                    lock.release()
+                    print(f"🔓 释放知识库 {kb_id} 的处理锁")
+                except Exception as e:
+                    print(f"⚠️ 释放锁时出错: {e}")
+        else:
+            # 无法获取锁，重试任务
+            print(f"⏳ 知识库 {kb_id} 正在处理其他文件，稍后重试...")
+            raise self.retry(countdown=30, max_retries=60)
+    finally:
+        db.close()
 
 
 def _process_file_sync(file_id: int):
