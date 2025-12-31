@@ -1,4 +1,4 @@
-# LiuYun-Know 流云知
+# LiuYun-Know 流云
 
 一个基于 LangGraph 的智能知识库问答系统，支持 RAG 检索增强生成、联网搜索、MCP 工具调用和长期记忆管理。
 
@@ -245,7 +245,7 @@ CORS_ORIGINS=http://localhost:5173,http://localhost:3000
 本项目参考了以下优秀开源项目：
 
 - [LightRAG](https://github.com/HKUDS/LightRAG) - 知识库 RAG 核心实现，知识图谱 + 向量检索混合方案，环境配置请参考该项目文档
-- [Yuxi-Know](https://github.com/xerrors/Yuxi-Know)
+- [Yuxi-Know](https://github.com/xerrors/Yuxi-Know) - 项目架构思路参考
 
 ## 📝 License
 
