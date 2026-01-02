@@ -20,7 +20,6 @@ wheels/
 .installed.cfg
 *.egg
 MANIFEST
-*.log
 
 # Virtual Environment
 venv/
@@ -36,10 +35,13 @@ env/
 *~
 .DS_Store
 .claude
+
 # Environment variables
 .env
 .env.local
 .env.*.local
+.env.docker.template
+.python-version
 
 # Database
 *.db
@@ -47,6 +49,7 @@ env/
 *.sqlite3
 
 # Data directories
+data/
 data/sqlite/
 data/minio/
 data/chroma/
@@ -67,6 +70,7 @@ logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+backend/logs/
 
 # Testing
 .pytest_cache/
@@ -77,6 +81,7 @@ htmlcov/
 # Celery
 celerybeat-schedule
 celerybeat.pid
+*.pid
 
 # Temporary files
 *.tmp
@@ -98,3 +103,30 @@ backend/diagrams/*.drawio
 # 数据库迁移和测试文件
 backend/alembic/
 backend/tests/
+
+# Docker 相关
+*.tar
+*.tar.gz
+*.tgz
+
+# OS 文件
+Thumbs.db
+.DS_Store
+.Spotlight-V100
+.Trashes
+
+# pip
+pip-log.txt
+pip-delete-this-directory.txt
+
+# 单元测试覆盖率
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
