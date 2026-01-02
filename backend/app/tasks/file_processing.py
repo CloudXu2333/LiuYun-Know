@@ -66,12 +66,46 @@ async def _create_llm_func(prompt, system_prompt=None, history_messages=[], **kw
 
 async def _create_embedding_func(texts: list[str]) -> np.ndarray:
     """创建 Embedding 函数"""
-    return await openai_embed(
-        texts,
-        model=settings.embedding_model,
-        api_key=settings.qwen_api_key,
+    import httpx
+
+    # 直接调用 OpenAI 兼容的 API，绕过 LightRAG 的 openai_embed
+    # 因为我们需要明确控制 embedding 维度
+    client = httpx.AsyncClient(
         base_url=settings.qwen_api_base,
+        timeout=60.0
     )
+
+    headers = {
+        "Authorization": f"Bearer {settings.qwen_api_key}",
+        "Content-Type": "application/json"
+    }
+
+    # 千问 API 返回的维度已经是正确的，我们只需要包装一下
+    response = await client.post(
+        "/embeddings",
+        headers=headers,
+        json={
+            "model": settings.embedding_model,
+            "input": texts,
+            "encoding_format": "float"
+        }
+    )
+
+    if response.status_code != 200:
+        raise ValueError(f"Embedding API 错误: {response.status_code} - {response.text}")
+
+    data = response.json()
+    embeddings = [item["embedding"] for item in data["data"]]
+
+    result = np.array(embeddings, dtype=np.float32)
+
+    # 确保返回的是二维数组
+    if len(result.shape) == 1:
+        result = result.reshape(1, -1)
+
+    await client.aclose()
+
+    return result
 
 
 async def _insert_text_to_rag(working_dir: str, text: str, file_name: str = None):

@@ -83,12 +83,43 @@ class LightRAGService:
     
     async def _create_embedding_func(self, texts: list[str]) -> np.ndarray:
         """创建 Embedding 函数（使用千问 Embedding）"""
-        return await openai_embed(
-            texts,
-            model=settings.embedding_model,
-            api_key=settings.qwen_api_key,
+        import httpx
+
+        # 直接调用 OpenAI 兼容的 API，绕过 LightRAG 的 openai_embed
+        client = httpx.AsyncClient(
             base_url=settings.qwen_api_base,
+            timeout=60.0
         )
+
+        headers = {
+            "Authorization": f"Bearer {settings.qwen_api_key}",
+            "Content-Type": "application/json"
+        }
+
+        response = await client.post(
+            "/embeddings",
+            headers=headers,
+            json={
+                "model": settings.embedding_model,
+                "input": texts,
+                "encoding_format": "float"
+            }
+        )
+
+        if response.status_code != 200:
+            raise ValueError(f"Embedding API 错误: {response.status_code} - {response.text}")
+
+        data = response.json()
+        embeddings = [item["embedding"] for item in data["data"]]
+
+        result = np.array(embeddings, dtype=np.float32)
+
+        if len(result.shape) == 1:
+            result = result.reshape(1, -1)
+
+        await client.aclose()
+
+        return result
     
     async def get_or_create_rag(self, working_dir: str) -> LightRAG:
         """

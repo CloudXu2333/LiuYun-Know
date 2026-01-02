@@ -38,8 +38,8 @@ async def init_database():
         else:
             admin_user = User(
                 username="admin",
-                email="admin@liuyun.local",
-                hashed_password=get_password_hash("admin"),
+                email="admin@outlook.com",
+                hashed_password=get_password_hash("admin111"),
                 is_active=True,
                 is_superuser=True
             )
@@ -47,7 +47,7 @@ async def init_database():
             await db.commit()
             print("✅ 默认管理员账号创建成功")
             print("   用户名: admin")
-            print("   密码: admin")
+            print("   密码: admin111")
             print("   ⚠️  请登录后立即修改密码！")
     
     print("\n🎉 数据库初始化完成！")
