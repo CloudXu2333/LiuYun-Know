@@ -56,5 +56,8 @@ echo ""
 echo "Press Ctrl+C to stop the server"
 echo ""
 
-# 启动服务器
-python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+# 创建日志目录
+mkdir -p logs
+
+# 启动服务器，输出到日志文件
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 2>&1 | tee logs/backend.log
