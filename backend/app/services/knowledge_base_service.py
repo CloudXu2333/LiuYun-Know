@@ -635,9 +635,10 @@ class KnowledgeBaseService:
     @staticmethod
     def get_file_preview_url(kb_id: int, file_record: KnowledgeFile) -> str:
         """
-        获取文件预览URL
+        获取文件预览URL（通过后端代理）
         """
-        return minio_service.get_presigned_url(file_record.minio_path)
+        # 返回后端代理下载 URL
+        return f"/api/knowledge-bases/{kb_id}/files/{file_record.id}/download"
 
 
 knowledge_base_service = KnowledgeBaseService()

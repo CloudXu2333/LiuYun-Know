@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     minio_secret_key: str = Field(default="minioadmin", alias="MINIO_SECRET_KEY")
     minio_bucket_name: str = Field(default="liuyun-know", alias="MINIO_BUCKET_NAME")
     minio_secure: bool = Field(default=False, alias="MINIO_SECURE")
+    minio_external_url: str = Field(default="", alias="MINIO_EXTERNAL_URL")  # 外部访问地址
     
     # Chroma 配置
     chroma_host: str = Field(default="localhost", alias="CHROMA_HOST")

@@ -310,9 +310,54 @@ async def get_file_preview_url(
     file_record = next((f for f in files if f.id == file_id), None)
     if not file_record:
         raise HTTPException(status_code=404, detail="文件不存在")
-    
+
     url = knowledge_base_service.get_file_preview_url(kb_id, file_record)
     return {"url": url}
+
+
+@router.get("/{kb_id}/files/{file_id}/download")
+async def download_file(
+    kb_id: int,
+    file_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """下载文件（通过后端代理）"""
+    from fastapi.responses import StreamingResponse
+    from app.services.minio_service import minio_service
+    import io
+    from urllib.parse import quote
+
+    kb = await knowledge_base_service.get_knowledge_base(db, kb_id, current_user.id)
+    if not kb:
+        raise HTTPException(status_code=404, detail="知识库不存在")
+
+    files = await knowledge_base_service.list_files(db, kb_id, current_user.id)
+    file_record = next((f for f in files if f.id == file_id), None)
+    if not file_record:
+        raise HTTPException(status_code=404, detail="文件不存在")
+
+    try:
+        # 从 MinIO 获取文件流
+        file_stream = minio_service.get_file_stream(file_record.minio_path)
+
+        # 读取文件内容
+        file_content = io.BytesIO(file_stream.read())
+        file_content.seek(0)
+
+        # 对文件名进行 URL 编码，支持中文
+        encoded_filename = quote(file_record.original_filename)
+
+        # 返回文件流
+        return StreamingResponse(
+            file_content,
+            media_type="application/octet-stream",
+            headers={
+                "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"
+            }
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"文件下载失败: {str(e)}")
 
 
 @router.delete("/{kb_id}/files/batch", status_code=status.HTTP_204_NO_CONTENT)

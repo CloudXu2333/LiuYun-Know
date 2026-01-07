@@ -123,21 +123,38 @@ class MinIOService:
     def get_presigned_url(self, object_name: str, expires_hours: int = 1) -> str:
         """
         获取预签名URL用于文件预览/下载
-        
+
         Args:
             object_name: 对象名称（路径）
             expires_hours: URL有效期（小时）
-            
+
         Returns:
             预签名URL
         """
         from datetime import timedelta
+        from urllib.parse import urlparse, urlunparse
+
         try:
             url = self.client.presigned_get_object(
                 self.bucket_name,
                 object_name,
                 expires=timedelta(hours=expires_hours)
             )
+
+            # 替换为外部访问地址
+            if settings.minio_external_url:
+                parsed = urlparse(url)
+                # 替换 scheme 和 netloc
+                external_parsed = urlparse(settings.minio_external_url)
+                url = urlunparse((
+                    external_parsed.scheme or parsed.scheme,
+                    external_parsed.netloc or parsed.netloc,
+                    parsed.path,
+                    parsed.params,
+                    parsed.query,
+                    parsed.fragment
+                ))
+
             return url
         except S3Error as e:
             print(f"❌ MinIO presigned URL error: {e}")

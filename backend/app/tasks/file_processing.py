@@ -53,6 +53,9 @@ def _get_workspace_label(working_dir: str) -> str:
 
 async def _create_llm_func(prompt, system_prompt=None, history_messages=[], **kwargs):
     """创建 LLM 函数（使用 DeepSeek 模型进行实体抽取）"""
+    # DeepSeek 不支持 response_format 参数和 keyword_extraction，过滤掉
+    kwargs.pop('response_format', None)
+    kwargs.pop('keyword_extraction', None)
     return await openai_complete_if_cache(
         model="deepseek-chat",
         prompt=prompt,

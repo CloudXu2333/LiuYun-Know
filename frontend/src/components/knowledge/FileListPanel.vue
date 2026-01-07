@@ -330,7 +330,27 @@ const retryFile = async (file) => {
 const previewFile = async (file) => {
   try {
     const { url } = await getFilePreviewUrl(props.knowledgeBaseId, file.id)
-    window.open(url, '_blank')
+    // 使用 fetch 下载文件，自动携带认证信息
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+      }
+    })
+
+    if (!response.ok) {
+      throw new Error('下载失败')
+    }
+
+    // 创建 blob 下载链接
+    const blob = await response.blob()
+    const downloadUrl = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = downloadUrl
+    a.download = file.original_filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    window.URL.revokeObjectURL(downloadUrl)
   } catch (err) {
     console.error('Preview failed:', err)
   }
