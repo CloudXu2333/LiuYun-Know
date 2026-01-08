@@ -57,13 +57,20 @@ const handleMessage = (event) => {
 onMounted(() => {
   const userId = authStore.user?.id
   const isAdmin = authStore.user?.is_superuser
-  // 生产环境应从配置读取 URL，这里硬编码为本地 Vite 端口
+
+  // 动态获取当前访问的主机名和端口
+  // 如果是通过 IP 访问的,iframe 也使用相同的 IP,避免跨域问题
+  const hostname = window.location.hostname
+  const protocol = window.location.protocol
+
+  // Banana-Slides 前端端口固定为 5174
   // 注意：需要确保 Banana-Slides 服务已在 5174 端口启动
   // 通过 uid 参数传递用户 ID 实现隔离，is_admin 参数控制设置按钮显示
-  iframeUrl.value = userId 
-    ? `http://localhost:5174?uid=${userId}&is_admin=${isAdmin}` 
-    : 'http://localhost:5174'
-    
+  const baseUrl = `${protocol}//${hostname}:5174`
+  iframeUrl.value = userId
+    ? `${baseUrl}?uid=${userId}&is_admin=${isAdmin}`
+    : baseUrl
+
   // 监听 iframe 消息
   window.addEventListener('message', handleMessage)
 })

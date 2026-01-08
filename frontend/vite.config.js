@@ -12,6 +12,13 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',  // 监听所有网络接口，允许通过 IP 访问
     port: 5173,
+    allowedHosts: [
+      'www.liuyun-know.online',
+      'liuyun-know.online',
+      '82.156.159.181',
+      'localhost',
+      '.liuyun-know.online',  // 允许所有子域名
+    ],
     proxy: {
       '/api': {
         target: 'http://localhost:8001',  // 修改为 8001

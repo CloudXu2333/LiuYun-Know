@@ -25,31 +25,31 @@ if not exist "logs" mkdir logs
 
 echo.
 echo ========================================
-echo Starting Backend at http://localhost:5001
-echo Starting Frontend at http://localhost:5174
+echo Starting Backend at http://0.0.0.0:5001
+echo Starting Frontend at http://0.0.0.0:5174
 echo Backend logs: banana-slides\logs\backend.log
 echo Frontend logs: banana-slides\logs\frontend.log
 echo ========================================
 echo.
 
-REM 启动后端服务器 (后台运行,日志保存到 logs/backend.log)
+REM 启动后端服务器 (后台运行,监听 0.0.0.0:5001,日志保存到 logs/backend.log)
 cd backend
-start /B cmd /C "python app.py > ..\logs\backend.log 2>&1"
+start /B cmd /C "set FLASK_RUN_HOST=0.0.0.0 && set PORT=5001 && python app.py > ..\logs\backend.log 2>&1"
 cd ..
 
 REM 等待后端启动
 timeout /t 3 /nobreak >nul
 
-REM 启动前端服务器 (后台运行,日志保存到 logs/frontend.log)
+REM 启动前端服务器 (后台运行,监听 0.0.0.0:5174,日志保存到 logs/frontend.log)
 cd frontend
-start /B cmd /C "npm run dev -- --port 5174 > ..\logs\frontend.log 2>&1"
+start /B cmd /C "npm run dev -- --host 0.0.0.0 --port 5174 > ..\logs\frontend.log 2>&1"
 cd ..
 
 echo.
 echo [SUCCESS] Servers started in background!
-echo Backend:  http://localhost:5001
-echo Frontend: http://localhost:5174
+echo Backend:  http://0.0.0.0:5001 (IPv4)
+echo Frontend: http://0.0.0.0:5174 (IPv4)
 echo.
 echo To stop servers, run stop_dev.bat
-echo To view logs: tail -f logs/backend.log or logs/frontend.log
+echo To view logs: type logs\backend.log or logs\frontend.log
 echo.

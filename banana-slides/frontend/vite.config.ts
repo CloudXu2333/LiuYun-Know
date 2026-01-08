@@ -15,9 +15,9 @@ export default defineConfig(({ mode }) => {
   // 使用 loadEnv 加载环境变量（第三个参数为空字符串表示加载所有变量，不仅仅是 VITE_ 前缀的）
   const env = loadEnv(mode, envDir, '')
 
-  // 读取后端端口，默认 5000
+  // 读取后端端口，默认 5001（与 run_dev.bat 保持一致）
   // 支持从环境变量 PORT 读取（与后端保持一致）
-  const backendPort = env.PORT || '5000'
+  const backendPort = env.PORT || '5001'
   const backendUrl = `http://localhost:${backendPort}`
 
   return {
@@ -30,7 +30,14 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       port: 5174,
-      host: true, // 监听所有地址
+      host: '0.0.0.0', // 监听 IPv4 地址
+      allowedHosts: [
+        'www.liuyun-know.online',
+        'liuyun-know.online',
+        '82.156.159.181',
+        'localhost',
+        '.liuyun-know.online',  // 允许所有子域名
+      ],
       watch: {
         usePolling: true, // WSL 环境下需要启用轮询
       },

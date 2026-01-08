@@ -170,3 +170,13 @@ banana-slides/*.webp
 !banana-slides/frontend/public/**/*
 !banana-slides/e2e/fixtures/*.png
 !banana-slides/template*.png
+
+# Nginx 配置
+nginx.conf
+nginx.conf.example
+
+# CLAUDE AI 生成的文档
+**/CLAUDE.md
+
+# Vite 可执行文件
+banana-slides/frontend/vite

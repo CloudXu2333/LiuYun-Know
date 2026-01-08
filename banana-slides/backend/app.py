@@ -206,7 +206,7 @@ if __name__ == '__main__':
     if os.getenv("IN_DOCKER", "0") == "1":
         port = 5000 # 在 docker 内部部署时始终使用 5000 端口.
     else:
-        port = int(os.getenv('PORT', 5000))
+        port = int(os.getenv('PORT', 5001))  # 默认端口改为 5001,与启动脚本保持一致
     debug = os.getenv('FLASK_ENV', 'development') == 'development'
     
     logging.info(

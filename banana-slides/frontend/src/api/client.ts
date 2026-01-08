@@ -1,8 +1,23 @@
 import axios from 'axios';
 
-// 开发环境：通过 Vite proxy 转发
-// 生产环境：通过 nginx proxy 转发
-const API_BASE_URL = '';
+// API 基础 URL - 根据访问地址动态设置
+// 如果是本地开发，使用相对路径通过 Vite proxy
+// 如果是生产环境通过 IP 访问，使用实际的后端地址
+const getBaseUrl = () => {
+  const hostname = window.location.hostname;
+
+  // 本地开发环境：使用相对路径
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    return ''; // 使用 Vite proxy
+  }
+
+  // 生产环境：使用实际的 IP 和端口
+  // 前端端口 5174, 后端端口 5001
+  // 注意：需要确保后端实际运行在 5001 端口
+  return `http://${hostname}:5001`;
+};
+
+const API_BASE_URL = getBaseUrl();
 
 // 创建 axios 实例
 export const apiClient = axios.create({
