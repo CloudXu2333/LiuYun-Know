@@ -115,29 +115,43 @@ npm install
 
 前端会自动连接到 `http://localhost:5000` 的后端服务。如需修改，请编辑 `src/api/client.ts`。
 
-#### 启动后端服务
+#### 启动服务
+
+**使用一键启动脚本(推荐):**
+
+```bash
+# Windows (后台运行,日志保存在 logs/ 目录)
+run_dev.bat
+
+# 停止服务
+stop_dev.bat
+
+# Linux/Mac (后台运行,日志保存在 logs/ 目录)
+./run_dev.sh
+
+# 停止服务
+./stop_dev.sh
+```
+
+后端将在 `http://localhost:5001` 启动
+前端将在 `http://localhost:5174` 启动
+
+访问 `http://localhost:5001/health` 验证后端服务是否正常运行。
+
+**手动启动(不推荐):**
+
 > （可选）如果本地已有重要数据，升级前建议先备份数据库：
 > `cp backend/instance/database.db backend/instance/database.db.bak`
 
 ```bash
+# 后端
 cd backend
 uv run alembic upgrade head && uv run python app.py
-```
 
-后端服务将在 `http://localhost:5000` 启动。
-
-访问 `http://localhost:5000/health` 验证服务是否正常运行。
-
-#### 启动前端开发服务器
-
-```bash
+# 前端(新终端)
 cd frontend
-npm run dev
+npm run dev -- --port 5174
 ```
-
-前端开发服务器将在 `http://localhost:3000` 启动。
-
-打开浏览器访问即可使用应用。
 
 ## 🛠️ 技术架构
 

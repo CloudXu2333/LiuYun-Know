@@ -67,8 +67,8 @@ docker-compose up -d
 
 # 访问服务
 # 前端：http://localhost
-# 后端 API：http://localhost:8000
-# API 文档：http://localhost:8000/docs
+# 后端 API：http://localhost:8001
+# API 文档：http://localhost:8001/docs
 # MinIO 控制台：http://localhost:9001 (minioadmin/minioadmin)
 # Neo4j 浏览器：http://localhost:7474（如果启用）
 ```
@@ -96,9 +96,13 @@ copy .env.example .env
 # 初始化数据库（首次运行）
 python init_db.py
 
-# 启动服务
+# 启动服务(后台运行,日志保存在 logs/ 目录)
 run_dev.bat
-# 或
+
+# 停止服务
+stop_dev.bat
+
+# 或前台运行
 python -m uvicorn app.main:app --reload --port 8001
 ```
 
@@ -121,10 +125,14 @@ cp .env.example .env
 # 初始化数据库（首次运行）
 python init_db.py
 
-# 启动服务
+# 启动服务(后台运行,日志保存在 logs/ 目录)
 ./run_dev.sh
-# 或
-python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+# 停止服务
+./stop_dev.sh
+
+# 或前台运行
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
 ```
 
 #### 启动 Celery Worker
@@ -363,33 +371,29 @@ GOOGLE_API_BASE=https://generativelanguage.googleapis.com
 BAIDU_OCR_API_KEY=your-baidu-ocr-api-key
 
 # 服务端口
-PORT=5000
+PORT=5001
 ```
 
-**后端启动:**
+**启动后端和前端:**
 
 ```bash
-cd banana-slides/backend
+# Windows (后台运行,日志保存在 banana-slides/logs/ 目录)
+cd banana-slides
+run_dev.bat
 
-# Windows
-run.bat
+# 停止服务
+stop_dev.bat
 
-# Linux/Mac
-./run.sh
+# Linux/Mac (后台运行,日志保存在 banana-slides/logs/ 目录)
+cd banana-slides
+./run_dev.sh
+
+# 停止服务
+./stop_dev.sh
 ```
 
-后端将在 http://localhost:5000 启动
-
-**前端启动:**
-
-```bash
-cd banana-slides/frontend
-
-npm install
-npm run dev
-```
-
-前端将在 http://localhost:3000 启动
+后端将在 http://localhost:5001 启动
+前端将在 http://localhost:5174 启动
 
 详细功能说明请参考 [banana-slides/README.md](banana-slides/README.md)
 

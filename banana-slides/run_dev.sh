@@ -1,25 +1,18 @@
 #!/bin/bash
-# LiuYun-Know Backend Development Server
+# Banana-Slides Development Server
 # Linux/Mac 启动脚本 - 后台启动前后端
 
 echo "========================================"
-echo "Starting LiuYun-Know Backend & Frontend"
+echo "Starting Banana-Slides Backend & Frontend"
 echo "========================================"
 echo ""
-
-# 检查 .env 文件
-if [ ! -f ".env" ]; then
-    echo "[WARNING] .env file not found!"
-    echo "Please create .env file based on CONFIG_GUIDE.md"
-    echo ""
-fi
 
 # 激活虚拟环境
 source venv/bin/activate
 
 # 检查依赖
 echo "Checking dependencies..."
-python -c "import fastapi" 2>/dev/null
+python -c "import flask" 2>/dev/null
 if [ $? -ne 0 ]; then
     echo "[ERROR] Dependencies not installed!"
     echo "Please run: pip install -r requirements.txt"
@@ -31,28 +24,29 @@ mkdir -p logs
 
 echo ""
 echo "========================================"
-echo "Starting Backend at http://localhost:8001"
-echo "Starting Frontend at http://localhost:5173"
-echo "API Docs: http://localhost:8001/docs"
-echo "Backend logs: backend/logs/backend.log"
-echo "Frontend logs: backend/logs/frontend.log"
+echo "Starting Backend at http://localhost:5001"
+echo "Starting Frontend at http://localhost:5174"
+echo "Backend logs: banana-slides/logs/backend.log"
+echo "Frontend logs: banana-slides/logs/frontend.log"
 echo "========================================"
 echo ""
 
 # 启动后端服务器 (后台运行,日志保存到 logs/backend.log)
-nohup python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8001 > logs/backend.log 2>&1 &
+cd backend
+nohup python app.py > ../logs/backend.log 2>&1 &
 BACKEND_PID=$!
 echo "Backend started with PID: $BACKEND_PID"
+cd ..
 
 # 等待后端启动
 sleep 3
 
 # 启动前端服务器 (后台运行,日志保存到 logs/frontend.log)
-cd ../frontend
-nohup npm run dev -- --port 5173 > ../backend/logs/frontend.log 2>&1 &
+cd frontend
+nohup npm run dev -- --port 5174 > ../logs/frontend.log 2>&1 &
 FRONTEND_PID=$!
 echo "Frontend started with PID: $FRONTEND_PID"
-cd ../backend
+cd ..
 
 # 保存 PID 到文件
 echo $BACKEND_PID > logs/backend.pid
@@ -60,8 +54,8 @@ echo $FRONTEND_PID > logs/frontend.pid
 
 echo ""
 echo "[SUCCESS] Servers started in background!"
-echo "Backend:  http://localhost:8001 (PID: $BACKEND_PID)"
-echo "Frontend: http://localhost:5173 (PID: $FRONTEND_PID)"
+echo "Backend:  http://localhost:5001 (PID: $BACKEND_PID)"
+echo "Frontend: http://localhost:5174 (PID: $FRONTEND_PID)"
 echo ""
 echo "To stop servers, run stop_dev.sh"
 echo "To view logs:"
