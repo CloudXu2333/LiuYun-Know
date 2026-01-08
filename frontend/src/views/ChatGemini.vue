@@ -44,6 +44,17 @@
               </svg>
             </button>
 
+            <!-- AI 幻灯片按钮 -->
+            <button
+              @click="goToSlides"
+              class="btn-gemini-icon text-gemini-text-secondary"
+              title="AI 幻灯片"
+            >
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+              </svg>
+            </button>
+
             <button
               @click="handleNewChat"
               class="btn-gemini-icon text-gemini-text-secondary"
@@ -706,7 +717,7 @@
                   @input="adjustTextareaHeight"
                   @focus="isInputFocused = true"
                   @blur="isInputFocused = false"
-                  placeholder="输入消息，或者上传图片..."
+                  placeholder="输入消息..."
                   class="flex-1 bg-transparent border-0 focus:ring-0 text-gray-800 placeholder-gray-400 resize-none max-h-48 py-3 px-2 scrollbar-hide text-base leading-relaxed"
                   rows="1"
                   :disabled="loading"
@@ -1068,6 +1079,10 @@ const toggleSidebar = () => {
 
 const toggleUserMenu = () => {
   showUserMenu.value = !showUserMenu.value
+}
+
+const goToSlides = () => {
+  router.push('/slides')
 }
 
 const handleNewChat = () => {

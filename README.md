@@ -9,6 +9,7 @@
 - **联网搜索** - 集成 Tavily/Firecrawl，AI 自动提取搜索关键词
 - **MCP 工具** - 支持自定义 MCP (Model Context Protocol) 工具，AI 智能决策调用
 - **长期记忆** - 用户级长期记忆存储与检索，支持核心记忆标记
+- **AI 幻灯片** - 集成 Banana Slides，支持 AI 生成 PPT 演示文稿
 - **上下文压缩** - 自动压缩历史对话，优化 Token 使用
 - **多模型支持** - 兼容 OpenAI API 格式，支持 DeepSeek/Claude/GPT/Gemini 等
 - **Docker 部署** - 支持 Docker Compose 一键部署
@@ -52,13 +53,13 @@
 
 ```bash
 # 克隆项目
-git clone https://github.com/yourusername/liuyun_know.git
+git clone https://github.com/CloudXu2333/LiuYun-Know.git
 cd liuyun_know
 
 # 启动基础服务（Redis + MinIO）
 docker-compose up -d redis minio
 
-# 可选：启动 Neo4j 图数据库（取消注释 docker-compose.yml 中的 neo4j 配置）
+# 启动 Neo4j 图数据库（取消注释 docker-compose.yml 中的 neo4j 配置）
 # docker-compose up -d neo4j
 
 # 构建并启动完整服务
@@ -98,7 +99,7 @@ python init_db.py
 # 启动服务
 run_dev.bat
 # 或
-python -m uvicorn app.main:app --reload --port 8000
+python -m uvicorn app.main:app --reload --port 8001
 ```
 
 **Linux/Mac:**
@@ -247,6 +248,12 @@ FIRECRAWL_API_KEY=your-firecrawl-api-key
 CORS_ORIGINS=http://localhost:5173,http://localhost:3000
 ```
 
+### Banana Slides 配置
+
+如需使用 AI 幻灯片功能，需配置 `banana-slides/backend/.env` 文件。
+
+详细配置说明和示例请参考下方 **🍌 Banana Slides 集成** 章节。
+
 ### 模型配置说明
 
 系统支持两种方式配置对话模型：
@@ -281,6 +288,10 @@ CORS_ORIGINS=http://localhost:5173,http://localhost:3000
 │   │   ├── api/             # API 调用
 │   │   └── components/      # 通用组件
 │   └── package.json
+├── banana-slides/           # AI 幻灯片生成模块
+│   ├── backend/             # Flask 后端
+│   ├── frontend/            # React 前端
+│   └── README.md            # Banana Slides 详细文档
 └── README.md
 ```
 
@@ -309,6 +320,79 @@ CORS_ORIGINS=http://localhost:5173,http://localhost:3000
 └──────────┘
 ```
 
+## 🍌 Banana Slides 集成
+
+项目集成了 [Banana Slides](https://github.com/Anionex/banana-slides) AI 幻灯片生成功能，支持：
+- **想法/大纲/描述** 三种生成方式
+- **自然语言修改** - 口头调整 PPT 内容
+- **可编辑导出** - 导出可编辑的 PPTX/PDF 文件
+
+### 本地运行 Banana Slides
+
+Banana Slides 的依赖已集成到主项目的 `backend/requirements.txt` 中。
+
+**环境配置:**
+
+```bash
+cd banana-slides/backend
+
+# Windows
+copy .env.example .env
+
+# Linux/Mac
+cp .env.example .env
+
+# 编辑 .env 文件，配置以下必要参数：
+```
+
+配置示例：
+
+```env
+# AI Provider 格式 (gemini / openai / vertex)
+AI_PROVIDER_FORMAT=gemini
+
+# Gemini 格式配置
+GOOGLE_API_KEY=your-gemini-api-key
+GOOGLE_API_BASE=https://generativelanguage.googleapis.com
+
+# OpenAI 格式配置
+# OPENAI_API_KEY=your-openai-api-key
+# OPENAI_API_BASE=https://api.openai.com/v1
+
+# 百度 OCR（用于可编辑 PPTX 导出，可选）
+BAIDU_OCR_API_KEY=your-baidu-ocr-api-key
+
+# 服务端口
+PORT=5000
+```
+
+**后端启动:**
+
+```bash
+cd banana-slides/backend
+
+# Windows
+run.bat
+
+# Linux/Mac
+./run.sh
+```
+
+后端将在 http://localhost:5000 启动
+
+**前端启动:**
+
+```bash
+cd banana-slides/frontend
+
+npm install
+npm run dev
+```
+
+前端将在 http://localhost:3000 启动
+
+详细功能说明请参考 [banana-slides/README.md](banana-slides/README.md)
+
 ## 🛠️ MCP 工具配置
 
 支持 stdio 方式的 MCP Server，配置示例：
@@ -328,6 +412,7 @@ CORS_ORIGINS=http://localhost:5173,http://localhost:3000
 
 - [LightRAG](https://github.com/HKUDS/LightRAG) - 知识库 RAG 核心实现，知识图谱 + 向量检索混合方案，环境配置请参考该项目文档
 - [Yuxi-Know](https://github.com/xerrors/Yuxi-Know) - 项目架构思路参考
+- [Banana Slides](https://github.com/Anionex/banana-slides) - AI 幻灯片生成功能，基于 nano banana pro 模型实现 PPT 智能生成
 
 ## 📝 License
 

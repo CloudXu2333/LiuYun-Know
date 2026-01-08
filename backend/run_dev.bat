@@ -31,15 +31,15 @@ if errorlevel 1 (
 
 echo.
 echo ========================================
-echo Server starting at http://localhost:8000
-echo API Docs: http://localhost:8000/docs
+echo Server starting at http://localhost:8001
+echo API Docs: http://localhost:8001/docs
 echo ========================================
 echo.
 echo Press Ctrl+C to stop the server
 echo.
 
 REM 启动服务器
-python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
 
 pause
 

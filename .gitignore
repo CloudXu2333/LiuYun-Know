@@ -130,3 +130,43 @@ coverage.xml
 *.cover
 .hypothesis/
 .pytest_cache/
+
+# --- Banana Slides Specific ---
+banana-slides/node_modules/
+banana-slides/frontend/node_modules/
+banana-slides/frontend/dist/
+banana-slides/backend/instance/
+banana-slides/uploads/
+banana-slides/backend/uploads/
+banana-slides/_local_backup/
+banana-slides/v0_demo/
+banana-slides/server.log
+banana-slides/server_running.log
+banana-slides/backend/server.log
+banana-slides/backend/server_running.log
+banana-slides/gcp-service-account.json
+banana-slides/baidu.py
+banana-slides/nul
+banana-slides/.env
+
+# Banana Slides Media & Docs
+banana-slides/*.ppt
+banana-slides/*.pptx
+banana-slides/*.pdf
+banana-slides/*.md
+!banana-slides/README.md
+!banana-slides/README_EN.md
+!banana-slides/backend/README.md
+!banana-slides/.github/**/*.md
+
+# Banana Slides Images (Ignore temp images, keep assets)
+banana-slides/*.png
+banana-slides/*.jpg
+banana-slides/*.jpeg
+banana-slides/*.gif
+banana-slides/*.svg
+banana-slides/*.webp
+!banana-slides/assets/**/*
+!banana-slides/frontend/public/**/*
+!banana-slides/e2e/fixtures/*.png
+!banana-slides/template*.png

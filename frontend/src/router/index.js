@@ -70,6 +70,12 @@ const routes = [
     meta: { requiresAuth: true, requiresAdmin: true },
   },
   {
+    path: '/slides',
+    name: 'Slides',
+    component: () => import('@/views/SlidesPage.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/mcp-tools',
     name: 'MCPTools',
     component: () => import('@/views/MCPTools.vue'),
@@ -85,11 +91,11 @@ const router = createRouter({
 // 路由守卫
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
-  
+
   // 检查是否需要认证
   const requiresAuth = to.matched.some((record) => record.meta.requiresAuth !== false)
   const requiresAdmin = to.matched.some((record) => record.meta.requiresAdmin === true)
-  
+
   if (requiresAuth && !authStore.isAuthenticated) {
     // 需要认证但未登录，跳转到登录页
     next({ name: 'Login', query: { redirect: to.fullPath } })

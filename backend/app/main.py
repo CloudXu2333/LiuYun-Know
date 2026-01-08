@@ -1,6 +1,8 @@
 """
 FastAPI 应用入口
 """
+import time
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,6 +12,14 @@ from app.config import settings
 from app.core.database import init_db, close_db
 from app.core.redis_client import redis_client
 from app.api import auth, users, chat, knowledge_base, llm_config, memory, diagram, mcp_tool
+
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -85,6 +95,42 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 请求日志中间件
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """记录所有请求的详细信息"""
+    start_time = time.time()
+
+    # 记录请求信息
+    logger.info(f"📥 收到请求")
+    logger.info(f"   方法: {request.method}")
+    logger.info(f"   路径: {request.url.path}")
+    logger.info(f"   客户端: {request.client.host if request.client else 'unknown'}")
+
+    # 处理请求
+    try:
+        response = await call_next(request)
+
+        # 计算处理时间
+        process_time = time.time() - start_time
+
+        # 记录响应信息
+        logger.info(f"📤 响应状态: {response.status_code}")
+        logger.info(f"   处理时间: {process_time:.3f}秒")
+
+        # 添加处理时间到响应头
+        response.headers["X-Process-Time"] = str(process_time)
+        return response
+
+    except Exception as e:
+        # 记录异常
+        process_time = time.time() - start_time
+        logger.error(f"💥 请求处理异常")
+        logger.error(f"   路径: {request.url.path}")
+        logger.error(f"   异常: {str(e)}")
+        logger.error(f"   处理时间: {process_time:.3f}秒")
+        raise
+
 # 请求验证错误处理器 - 打印详细错误信息
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
@@ -139,11 +185,11 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    
+
     uvicorn.run(
         "app.main:app",
         host="0.0.0.0",
-        port=8000,
+        port=8001,  # 修改为 8001 避免与 VSCode 调试器冲突
         reload=settings.debug,
     )
 
